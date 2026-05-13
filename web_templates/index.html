@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>短剧智能体 - 工业化控制台 V3.0</title>
+    <title>番茄小说一键制造机 - 控制台</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -50,6 +50,33 @@
             margin-top: 0;
             margin-bottom: 15px;
             font-size: 18px;
+        }
+        .model-panel {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 18px 0;
+            padding: 10px 12px;
+            background: #252526;
+            border: 1px solid #333;
+            border-radius: 6px;
+        }
+        .model-panel label {
+            color: #dcdcaa;
+            font-size: 13px;
+        }
+        .model-panel select {
+            min-width: 260px;
+            background: #111;
+            color: #d4d4d4;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 13px;
+        }
+        .model-panel span {
+            color: #858585;
+            font-size: 12px;
         }
         .btn-group {
             display: grid;
@@ -104,7 +131,7 @@
 ║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
 ║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
 ╠════════════════════════════════════════════════════════════╣
-║              ⚛️⚛️【红果剧本一键制造机】⚛️⚛️                ║
+║              ⚛️⚛️【番茄小说一键制造机】⚛️⚛️                ║
 ╠════════════════════════════════════════════════════════════╣
 ║                   🐉 工业化控制台 V3.0 🐉                  ║
 ╚════════════════════════════════════════════════════════════╝
@@ -112,6 +139,12 @@
         </div>
         
         <div class="controls">
+            <div class="model-panel">
+                <label for="modelSelect">模型槽位</label>
+                <select id="modelSelect"></select>
+                <span id="modelHint">读取模型配置中...</span>
+            </div>
+
             <h2>核心工作流</h2>
             <div class="btn-group">
                 <button onclick="runCommand('preflight')">🧭 [1] 前置中台评审 (Preflight)</button>
@@ -126,12 +159,10 @@
                 <button onclick="runCommand('stats')">📊 [6] 查看统计数据 (Show Stats)</button>
                 <button onclick="runCommand('inspire')">🛰️ [7] 灵感探针 (Trend Radar)</button>
                 <button onclick="runCommand('cache')">🧹 [8] 缓存管理 (Cache Tools)</button>
-                <button onclick="runCommand('ltm')">🧠 [9] LTM写回审计 (LTM Review)</button>
             </div>
 
             <h2>诊断与测试项</h2>
             <div class="btn-group">
-                <button onclick="runCommand('diag_rag')">🔎 [10-1] 百炼 RAG 连接诊断</button>
                 <button onclick="runCommand('diag_validator')">🧪 [10-2] 运行格式校验自检</button>
                 <button onclick="runCommand('diag_renderer')">🎨 [10-3] 运行渲染引擎自检</button>
             </div>
@@ -149,18 +180,47 @@
     </div>
 
     <script>
+        async function loadModels() {
+            const select = document.getElementById('modelSelect');
+            const hint = document.getElementById('modelHint');
+            try {
+                const response = await fetch('/api/models');
+                const payload = await response.json();
+                select.innerHTML = '';
+                for (const item of payload.models || []) {
+                    const option = document.createElement('option');
+                    option.value = item.slot;
+                    option.textContent = `${item.display_name} (${item.slot})`;
+                    option.disabled = !item.enabled;
+                    if (item.slot === payload.default_slot) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                }
+                hint.textContent = '生成任务会携带当前槽位';
+            } catch (error) {
+                hint.textContent = `模型配置读取失败: ${error}`;
+            }
+        }
+
         async function runCommand(cmd) {
             const outputBox = document.getElementById('output');
-            outputBox.textContent = `[System] 正在启动任务: ${cmd}...\n`;
+            const modelSlot = document.getElementById('modelSelect').value;
+            outputBox.textContent = `[System] 正在启动任务: ${cmd}\n[ModelSlot] ${modelSlot}\n`;
             
             try {
-                const response = await fetch(`/api/run/${cmd}`, { method: 'POST' });
+                const response = await fetch(`/api/run/${cmd}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_slot: modelSlot})
+                });
                 const result = await response.json();
                 outputBox.textContent += `\n[Result]\n${result.output}`;
             } catch (error) {
                 outputBox.textContent += `\n[Error] 请求失败: ${error}`;
             }
         }
+        loadModels();
     </script>
 </body>
 </html>

@@ -14,10 +14,14 @@ def _get_cache_manager(workspace: str):
     return CacheManager(cache_dir)
 
 
-def _run_pipeline_command(no_cache: bool, bundle_path: Optional[str] = None) -> None:
+def _run_pipeline_command(
+    no_cache: bool,
+    bundle_path: Optional[str] = None,
+    model_slot: Optional[str] = None,
+) -> None:
     from core_engine.main_pipeline import main as run_pipeline
 
-    run_pipeline(no_cache=no_cache, bundle_path=bundle_path)
+    run_pipeline(no_cache=no_cache, bundle_path=bundle_path, model_slot=model_slot)
 
 
 def _show_stats_command() -> None:
@@ -89,6 +93,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="启动全自动流水线处理 drafts/ 文件夹")
     run_parser.add_argument("--no-cache", action="store_true", help="忽略现有解析快照，强制重新调用 LLM")
     run_parser.add_argument("--bundle", help="Pre-Hub ContextBundle JSON 路径，用于注入立项上下文")
+    run_parser.add_argument("--model-slot", help="选择 OpenAI Chat Completions 模型槽位，例如 model_slot_1")
 
     clear_parser = subparsers.add_parser("clear-cache", help="清理渲染缓存数据")
     clear_parser.add_argument("--filter", type=str, help="根据关键词筛选清理特定题材或剧本")
@@ -101,13 +106,13 @@ def build_parser() -> argparse.ArgumentParser:
     package_parser.add_argument("--genre", required=True, help="题材或投稿赛道")
     package_parser.add_argument("--author", required=True, help="笔名或工作室名")
 
-    subparsers.add_parser("verify-rag", help="检查百炼 RAG 连接是否可用")
+    subparsers.add_parser("verify-rag", help=argparse.SUPPRESS)
 
     self_test_parser = subparsers.add_parser("self-test", help="运行内置诊断自检")
     self_test_parser.add_argument("target", choices=["validator", "renderer"], help="选择要运行的自检目标")
     self_test_parser.add_argument("--output-dir", help="renderer 自检输出目录")
 
-    ltm_parser = subparsers.add_parser("ltm-review", help="查看或应用 Pre-Hub LTM 写回候选")
+    ltm_parser = subparsers.add_parser("ltm-review", help=argparse.SUPPRESS)
     ltm_parser.add_argument("--project-id", help="只处理指定项目ID")
     ltm_parser.add_argument("--apply-approved", action="store_true", help="将已批准候选写回云端 LTM")
 
@@ -119,7 +124,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "run":
-        _run_pipeline_command(no_cache=args.no_cache, bundle_path=args.bundle)
+        _run_pipeline_command(
+            no_cache=args.no_cache,
+            bundle_path=args.bundle,
+            model_slot=args.model_slot,
+        )
         return 0
 
     if args.command == "stats":

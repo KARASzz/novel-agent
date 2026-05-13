@@ -1,29 +1,104 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-from openai import OpenAI
+
+try:
+    from openai import OpenAI
+except ImportError:  # pragma: no cover - exercised when dependency is absent
+    class OpenAI:  # type: ignore[no-redef]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            raise ImportError("Missing dependency: install `openai` to call model APIs.")
+
+
+@dataclass
+class LLMResponse:
+    """Small compatibility wrapper around a Chat Completions response."""
+
+    raw: Any
+    output_text: str
+    usage: Any = None
+
 
 class LLMClient:
     """
-    大语言模型调用代理 (LLM Client Proxy)
-    职责：封装 DashScope (OpenAI 兼容接口) 的调用逻辑，
-    处理 instructions/input 的拼装，以及 Reasoning Mode (Thinking) 和 Session Cache 的自动注入。
+    OpenAI Chat Completions compatible client.
+
+    The rest of the project can keep calling `create_response(...)` with
+    `instructions + input_text`, while this class maps that shape onto the
+    provider-neutral `chat.completions.create` API used by MiniMax and other
+    OpenAI-compatible domestic endpoints.
     """
+
     def __init__(
-        self, 
-        api_key: str, 
-        base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        timeout: float = 300.0
+        self,
+        api_key: str,
+        base_url: str,
+        timeout: float = 300.0,
     ):
+        if not base_url:
+            raise ValueError("OpenAI Chat Completions base_url is required.")
+
         self.api_key = api_key
         self.base_url = base_url
         self.timeout = timeout
-        
-        # 默认开启 Session Cache Header，优化长剧本上下文解析时的响应速度和 Token 消耗
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
             timeout=self.timeout,
-            default_headers={"x-dashscope-session-cache": "enable"}
         )
+
+    @staticmethod
+    def _extract_output_text(response: Any) -> str:
+        choices = getattr(response, "choices", None)
+        if choices is None and isinstance(response, dict):
+            choices = response.get("choices")
+        if not choices:
+            return ""
+
+        first = choices[0]
+        message = getattr(first, "message", None)
+        if message is None and isinstance(first, dict):
+            message = first.get("message")
+
+        if isinstance(message, dict):
+            content = message.get("content", "")
+        else:
+            content = getattr(message, "content", "")
+
+        if isinstance(content, list):
+            parts: List[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    parts.append(str(item.get("text") or item.get("content") or ""))
+                else:
+                    parts.append(str(item))
+            return "".join(parts)
+        return str(content or "")
+
+    @staticmethod
+    def _convert_text_format(text: Any) -> Optional[Dict[str, Any]]:
+        if not isinstance(text, dict):
+            return None
+        fmt = text.get("format")
+        if fmt == "json":
+            return {"type": "json_object"}
+        if not isinstance(fmt, dict):
+            return None
+
+        fmt_type = fmt.get("type")
+        if fmt_type == "json_schema":
+            return {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": fmt.get("name", "response_schema"),
+                    "strict": bool(fmt.get("strict", True)),
+                    "schema": fmt.get("schema", {}),
+                },
+            }
+        if fmt_type == "json_object":
+            return {"type": "json_object"}
+        return None
 
     def create_response(
         self,
@@ -33,38 +108,52 @@ class LLMClient:
         tools: Optional[List[Dict[str, Any]]] = None,
         temperature: float = 0.1,
         top_p: float = 0.7,
-        enable_thinking: bool = True,
+        enable_thinking: bool = False,
         timeout: Optional[float] = None,
-        **kwargs
-    ) -> Any:
-        """
-        发起模型调用请求 (通过 DashScope 的 Responses API)
-        
-        Args:
-            model: 模型 ID (例如 qwen3.6-plus)
-            instructions: 系统指令 (System Message)
-            input_text: 待处理输入 (User Message / Data)
-            tools: 已启用的插件/工具列表
-            temperature: 采样温度
-            top_p: 核采样概率
-            enable_thinking: 是否开启推理模式 (Reasoning Mode)
-            **kwargs: 其他透传给 responses.create 的参数 (如 text 格式设置)
-        """
-        body = {
+        **kwargs: Any,
+    ) -> LLMResponse:
+        """Create a model response through Chat Completions."""
+        body: Dict[str, Any] = {
             "model": model,
-            "instructions": instructions,
-            "input": input_text,
+            "messages": [
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": input_text},
+            ],
             "temperature": temperature,
             "top_p": top_p,
-            "extra_body": {"enable_thinking": enable_thinking}
         }
-        
+
         if tools:
             body["tools"] = tools
-            
-        # 允许透传额外的控制参数 (例如强制 JSON Schema 的 'text')
+
+        text_format = kwargs.pop("text", None)
+        response_format = kwargs.pop("response_format", None)
+        if response_format:
+            body["response_format"] = response_format
+        else:
+            converted_format = self._convert_text_format(text_format)
+            if converted_format:
+                body["response_format"] = converted_format
+
+        # Generic OpenAI-compatible providers should not receive provider-specific
+        # flags by default. Keep a deliberate escape hatch for endpoints that need it.
+        extra_body = kwargs.pop("extra_body", None)
+        if extra_body:
+            body["extra_body"] = extra_body
+        elif enable_thinking:
+            provider_options = kwargs.pop("provider_options", None)
+            if provider_options:
+                body["extra_body"] = provider_options
+
         body.update(kwargs)
-        
+
         if timeout is not None and hasattr(self.client, "with_options"):
-            return self.client.with_options(timeout=timeout).responses.create(**body)
-        return self.client.responses.create(**body)
+            raw = self.client.with_options(timeout=timeout).chat.completions.create(**body)
+        else:
+            raw = self.client.chat.completions.create(**body)
+
+        return LLMResponse(
+            raw=raw,
+            output_text=self._extract_output_text(raw),
+            usage=getattr(raw, "usage", None),
+        )

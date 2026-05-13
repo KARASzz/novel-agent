@@ -6,3 +6,6 @@ httpx
 requests>=2.33,<3
 tavily-python
 pytest-mock
+fastapi
+uvicorn
+jinja2

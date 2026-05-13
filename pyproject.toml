@@ -13,6 +13,9 @@ dependencies = [
     "httpx",
     "requests",
     "tavily-python",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
     "pytest",
     "pytest-mock",
 ]
@@ -25,6 +28,7 @@ build-backend = "setuptools.build_meta"
 # 显式指定需要打包的目录，避免把 logs, drafts 等数据文件夹也当成 Python 包
 packages = [
     "core_engine",
+    "chapter_pipeline",
     "rag_engine",
     "scripts",
     "pre_hub",

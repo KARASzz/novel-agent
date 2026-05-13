@@ -5,7 +5,7 @@ from collections import Counter
 from typing import Dict, List
 
 from core_engine.batch_processor import BatchProcessor, FileProcessResult
-from core_engine.config_loader import load_config
+from core_engine.config_loader import load_config, resolve_model_config
 from core_engine.packager import ProjectPackager
 
 
@@ -129,7 +129,7 @@ def show_stats(config: dict):
     print("=" * 54 + "\n")
 
 
-def main(no_cache: bool = False, bundle_path: str = None) -> None:
+def main(no_cache: bool = False, bundle_path: str = None, model_slot: str = None) -> None:
     """
     红果剧本工业化流水线执行入口 - 满足高并发与高质量双重需求
     """
@@ -139,12 +139,18 @@ def main(no_cache: bool = False, bundle_path: str = None) -> None:
 
     # 优先加载配置，确保后续所有组件共享同一个 config 实例以优化 I/O 与测试性
     config = load_config()
-    parser_cfg = config.get("parser", {})
+    if model_slot:
+        config.setdefault("parser", {})["model_slot"] = model_slot
     pipeline_cfg = config.get("pipeline", {})
-    api_key_env = parser_cfg.get("api_key_env", "DASHSCOPE_API_KEY")
+    model_cfg = resolve_model_config(config)
+    api_key_env = str(model_cfg.get("api_key_env") or "selected model API key")
 
     if not os.getenv(api_key_env):
-        print(f"[环境变量缺失] 请设置 API 密钥环境变量: {api_key_env}，否则无法调用 LLM 解析服务。")
+        print(f"[环境变量缺失] 请设置当前模型槽位的 API 密钥环境变量: {api_key_env}，否则无法调用 LLM 解析服务。")
+        return
+
+    if not model_cfg.get("base_url"):
+        print(f"[模型配置缺失] 当前模型槽位 {model_cfg.get('slot_name')} 缺少 Base URL，请先在 config.yaml 中接入真实模型。")
         return
 
     workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

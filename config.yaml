@@ -1,4 +1,8 @@
-# 红果短剧工作流配置
+# 番茄小说一键制造机配置
+project:
+  platform: "fanqie_novel"
+  product_name: "番茄小说一键制造机"
+
 pipeline:
   max_workers: 3
   report_json: true
@@ -8,18 +12,19 @@ pipeline:
     requests_per_second: 0
 
 parser:
-  api_key_env: "DASHSCOPE_API_KEY"
-  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  model: "qwen3.6-plus"
+  model_slot: "model_slot_1"
+  api_key_env: "MODEL_SLOT_1_API_KEY"
+  base_url: ""
+  model: "model-slot-1"
   timeout: 300
   max_retries: 3
   strict_validation: true
   tools:
-    web_search: true
-    web_extractor: true
-    code_interpreter: true
+    web_search: false
+    web_extractor: false
+    code_interpreter: false
     file_search: false
-    enable_thinking: true
+    enable_thinking: false
   enable_rag: true
   retry:
     base_delay_sec: 1.0
@@ -42,10 +47,10 @@ logging:
   log_level: "INFO"
 
 rag:
-  backend: "bailian"
+  backend: "local"
   workspace_id_env: "WORKSPACE_ID"
   index_id_env: "BAILIAN_INDEX_ID"
-  default_query: "短剧编剧通用规范、商业钩子设计、付费点卡点技巧"
+  default_query: "番茄小说开篇节奏、追读钩子、爽点外化、章节推进、读者留存"
   top_k: 2
   max_candidates: 120
   snippet_chars: 500
@@ -86,3 +91,42 @@ pre_hub:
 
 cache:
   parser_result_ttl_days: 180
+
+models:
+  default_slot: "model_slot_1"
+  slots:
+    model_slot_1:
+      display_name: "模型占位 1"
+      base_url: ""
+      api_key_env: "MODEL_SLOT_1_API_KEY"
+      model_id: "model-slot-1"
+      enabled: true
+      note: "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。"
+    model_slot_2:
+      display_name: "模型占位 2"
+      base_url: ""
+      api_key_env: "MODEL_SLOT_2_API_KEY"
+      model_id: "model-slot-2"
+      enabled: false
+      note: "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。"
+    model_slot_3:
+      display_name: "模型占位 3"
+      base_url: ""
+      api_key_env: "MODEL_SLOT_3_API_KEY"
+      model_id: "model-slot-3"
+      enabled: false
+      note: "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。"
+    model_slot_4:
+      display_name: "模型占位 4"
+      base_url: ""
+      api_key_env: "MODEL_SLOT_4_API_KEY"
+      model_id: "model-slot-4"
+      enabled: false
+      note: "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。"
+    model_slot_5:
+      display_name: "模型占位 5"
+      base_url: ""
+      api_key_env: "MODEL_SLOT_5_API_KEY"
+      model_id: "model-slot-5"
+      enabled: false
+      note: "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。"

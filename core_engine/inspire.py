@@ -3,7 +3,7 @@ import os
 import datetime
 
 from rag_engine.tavily_search import TavilySearcher
-from core_engine.config_loader import load_config
+from core_engine.config_loader import load_config, resolve_model_config
 from core_engine.logger import get_logger
 from core_engine.utils import get_enabled_tools
 from core_engine.llm_client import LLMClient
@@ -43,15 +43,19 @@ def main():
     
     cfg = load_config()
     parser_cfg = cfg.get("parser", {})
-    api_key_env = parser_cfg.get("api_key_env", "DASHSCOPE_API_KEY")
+    model_cfg = resolve_model_config(cfg)
+    api_key_env = str(model_cfg.get("api_key_env") or "selected model API key")
     api_key = os.getenv(api_key_env)
     
     if not api_key:
         print(f"❌ [环境错配] 缺少大模型 API Key 环境变量：{api_key_env}")
         sys.exit(1)
         
-    base_url = parser_cfg.get("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-    model = parser_cfg.get("model")
+    base_url = str(model_cfg.get("base_url") or "")
+    if not base_url:
+        print(f"❌ [模型配置缺失] 当前模型槽位 {model_cfg.get('slot_name')} 缺少 Base URL，请先在 config.yaml 中接入真实模型。")
+        sys.exit(1)
+    model = str(model_cfg.get("model_id") or "")
     
     client = LLMClient(
         api_key=api_key, 

@@ -8,21 +8,35 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from openai import (
-    APIConnectionError as _APIConnectionError,
-)
-from openai import (
-    APIStatusError as _APIStatusError,
-)
-from openai import (
-    APITimeoutError as _APITimeoutError,
-)
-from core_engine.llm_client import LLMClient
-from openai import (
-    RateLimitError as _RateLimitError,
-)
+try:
+    from openai import (
+        APIConnectionError as _APIConnectionError,
+    )
+    from openai import (
+        APIStatusError as _APIStatusError,
+    )
+    from openai import (
+        APITimeoutError as _APITimeoutError,
+    )
+    from openai import (
+        RateLimitError as _RateLimitError,
+    )
+except ImportError:  # pragma: no cover - exercised when dependency is absent
+    class _APIConnectionError(Exception):
+        pass
 
-from core_engine.config_loader import load_config
+    class _APIStatusError(Exception):
+        pass
+
+    class _APITimeoutError(Exception):
+        pass
+
+    class _RateLimitError(Exception):
+        pass
+
+from core_engine.llm_client import LLMClient
+
+from core_engine.config_loader import load_config, resolve_model_config
 from core_engine.logger import get_logger
 from core_engine.schemas import Episode
 from core_engine.cache_manager import CacheManager
@@ -153,13 +167,13 @@ class DraftParser:
         pipeline_cfg = self.config.get("pipeline", {})
         rate_limit_cfg = pipeline_cfg.get("rate_limit", {})
 
-        self.api_key_env = parser_cfg.get("api_key_env", "DASHSCOPE_API_KEY")
+        model_cfg = resolve_model_config(self.config)
+        self.model_slot = str(model_cfg.get("slot_name", "model_slot_1"))
+        self.model_display_name = str(model_cfg.get("display_name", self.model_slot))
+        self.api_key_env = str(model_cfg.get("api_key_env") or parser_cfg.get("api_key_env", ""))
         self.api_key = parser_cfg.get("api_key") or os.getenv(self.api_key_env)
-        self.base_url = parser_cfg.get(
-            "base_url",
-            "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        )
-        self.model = parser_cfg.get("model", "qwen-max")
+        self.base_url = str(model_cfg.get("base_url") or parser_cfg.get("base_url", ""))
+        self.model = str(model_cfg.get("model_id") or parser_cfg.get("model", ""))
         self.max_retries = int(parser_cfg.get("max_retries", 3))
         self.timeout = float(parser_cfg.get("timeout", 300))
         self.strict_validation = bool(parser_cfg.get("strict_validation", True))
@@ -180,7 +194,7 @@ class DraftParser:
             self.rate_limiter = RequestRateLimiter(requests_per_second)
 
         self._client: Optional[LLMClient] = None
-        if self.api_key:
+        if self.api_key and self.base_url:
             self._client = LLMClient(
                 api_key=self.api_key,
                 base_url=self.base_url,
@@ -611,11 +625,14 @@ class DraftParser:
                 )
 
         if self._client is None:
+            missing = self.api_key_env or "selected model API key"
+            if self.api_key and not self.base_url:
+                missing = f"base_url for model slot: {self.model_slot}"
             return ParseResult(
                 episode=None,
                 is_success=False,
                 error_type=ERROR_CONFIG,
-                error_message=f"Missing API key env var: {self.api_key_env}",
+                error_message=f"Missing model configuration: {missing}",
                 attempts=0,
                 retries=0,
                 request_count=0,

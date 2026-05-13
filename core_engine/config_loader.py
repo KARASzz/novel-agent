@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict, Optional
 
 _CONFIG_CACHE = None
-DEFAULT_MODEL = "qwen3.6-plus"
+DEFAULT_MODEL_SLOT = "model_slot_1"
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
@@ -20,6 +20,59 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 def reset_config_cache() -> None:
     global _CONFIG_CACHE
     _CONFIG_CACHE = None
+
+
+def get_model_registry(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Return the configured OpenAI Chat Completions model registry."""
+    cfg = config or load_config()
+    registry = cfg.get("models", {})
+    if not isinstance(registry, dict):
+        return {}
+    return registry
+
+
+def resolve_model_config(
+    config: Optional[Dict[str, Any]] = None,
+    slot_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Resolve a model slot into the values needed by LLMClient.
+
+    The project now treats model choices as runtime slots so the web console can
+    switch providers without changing pipeline code. Legacy parser-level fields
+    are still accepted as a compatibility fallback.
+    """
+    cfg = config or load_config()
+    parser_cfg = cfg.get("parser", {})
+    registry = get_model_registry(cfg)
+    slots = registry.get("slots", {}) if isinstance(registry.get("slots", {}), dict) else {}
+    selected = (
+        slot_name
+        or parser_cfg.get("model_slot")
+        or registry.get("default_slot")
+        or DEFAULT_MODEL_SLOT
+    )
+    slot = slots.get(selected)
+
+    if isinstance(slot, dict):
+        return {
+            "slot_name": selected,
+            "display_name": slot.get("display_name", selected),
+            "base_url": slot.get("base_url") or parser_cfg.get("base_url", ""),
+            "api_key_env": slot.get("api_key_env") or parser_cfg.get("api_key_env", ""),
+            "model_id": slot.get("model_id") or parser_cfg.get("model", ""),
+            "enabled": bool(slot.get("enabled", True)),
+            "note": slot.get("note", ""),
+        }
+
+    return {
+        "slot_name": selected,
+        "display_name": selected,
+        "base_url": parser_cfg.get("base_url", ""),
+        "api_key_env": parser_cfg.get("api_key_env", ""),
+        "model_id": parser_cfg.get("model", ""),
+        "enabled": True,
+        "note": "legacy_parser_config",
+    }
 
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
@@ -61,6 +114,10 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
 
 def _defaults() -> Dict[str, Any]:
     return {
+        "project": {
+            "platform": "fanqie_novel",
+            "product_name": "番茄小说一键制造机",
+        },
         "pipeline": {
             "max_workers": 3,
             "report_json": True,
@@ -69,20 +126,66 @@ def _defaults() -> Dict[str, Any]:
                 "requests_per_second": 0,  # 0 means disabled
             },
         },
+        "models": {
+            "default_slot": DEFAULT_MODEL_SLOT,
+            "slots": {
+                "model_slot_1": {
+                    "display_name": "模型占位 1",
+                    "base_url": "",
+                    "api_key_env": "MODEL_SLOT_1_API_KEY",
+                    "model_id": "model-slot-1",
+                    "enabled": True,
+                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                },
+                "model_slot_2": {
+                    "display_name": "模型占位 2",
+                    "base_url": "",
+                    "api_key_env": "MODEL_SLOT_2_API_KEY",
+                    "model_id": "model-slot-2",
+                    "enabled": False,
+                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                },
+                "model_slot_3": {
+                    "display_name": "模型占位 3",
+                    "base_url": "",
+                    "api_key_env": "MODEL_SLOT_3_API_KEY",
+                    "model_id": "model-slot-3",
+                    "enabled": False,
+                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                },
+                "model_slot_4": {
+                    "display_name": "模型占位 4",
+                    "base_url": "",
+                    "api_key_env": "MODEL_SLOT_4_API_KEY",
+                    "model_id": "model-slot-4",
+                    "enabled": False,
+                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                },
+                "model_slot_5": {
+                    "display_name": "模型占位 5",
+                    "base_url": "",
+                    "api_key_env": "MODEL_SLOT_5_API_KEY",
+                    "model_id": "model-slot-5",
+                    "enabled": False,
+                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                },
+            },
+        },
         "parser": {
-            "api_key_env": "DASHSCOPE_API_KEY",
-            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            "model": DEFAULT_MODEL,
+            "model_slot": DEFAULT_MODEL_SLOT,
+            "api_key_env": "MODEL_SLOT_1_API_KEY",
+            "base_url": "",
+            "model": "model-slot-1",
             "max_retries": 3,
             "timeout": 300,
             "enable_rag": False,
             "strict_validation": True,
             "tools": {
-                "web_search": True,
-                "web_extractor": True,
-                "code_interpreter": True,
+                "web_search": False,
+                "web_extractor": False,
+                "code_interpreter": False,
                 "file_search": False,
-                "enable_thinking": True,
+                "enable_thinking": False,
             },
             "retry": {
                 "base_delay_sec": 1.0,
@@ -109,7 +212,7 @@ def _defaults() -> Dict[str, Any]:
             "backend": "local",
             "workspace_id_env": "WORKSPACE_ID",
             "index_id_env": "BAILIAN_INDEX_ID",
-            "default_query": "短剧编剧通用规范、商业钩子设计、付费点卡点技巧",
+            "default_query": "番茄小说开篇节奏、追读钩子、爽点外化、章节推进、读者留存",
             "max_candidates": 120,
             "snippet_chars": 500,
             "top_k": 2,

@@ -78,19 +78,31 @@ def test_cli_renderer_self_test_passes_output_dir(monkeypatch):
     assert calls == {"target": "renderer", "output_dir": "tmp-output"}
 
 
-def test_cli_run_passes_bundle(monkeypatch):
+def test_cli_run_passes_bundle_and_model_slot(monkeypatch):
     calls = {}
 
-    def fake_run(no_cache, bundle_path=None):
+    def fake_run(no_cache, bundle_path=None, model_slot=None):
         calls["no_cache"] = no_cache
         calls["bundle_path"] = bundle_path
+        calls["model_slot"] = model_slot
 
     monkeypatch.setattr(cli, "_run_pipeline_command", fake_run)
 
-    exit_code = cli.main(["run", "--no-cache", "--bundle", "bundle.json"])
+    exit_code = cli.main([
+        "run",
+        "--no-cache",
+        "--bundle",
+        "bundle.json",
+        "--model-slot",
+        "model_slot_3",
+    ])
 
     assert exit_code == 0
-    assert calls == {"no_cache": True, "bundle_path": "bundle.json"}
+    assert calls == {
+        "no_cache": True,
+        "bundle_path": "bundle.json",
+        "model_slot": "model_slot_3",
+    }
 
 
 def test_cli_ltm_review_dispatch(monkeypatch):
