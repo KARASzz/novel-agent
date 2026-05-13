@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-04-02 02:07:31",
+  "summary": {
+    "total_files": 1,
+    "processed_success": 1,
+    "processed_failed": 0,
+    "quality_passed": 1,
+    "quality_failed": 0,
+    "quality_not_run": 0,
+    "avg_total_sec": 79.2523,
+    "error_breakdown": {},
+    "quality_error_breakdown": {}
+  },
+  "files": [
+    {
+      "filename": "123.txt",
+      "input_path": "D:\\+红果剧本一键制造机\\drafts\\123.txt",
+      "output_path": "D:\\+红果剧本一键制造机\\scripts_output\\123_成品剧本.txt",
+      "processed_success": true,
+      "validation_status": "passed",
+      "quality_passed": true,
+      "stage_status": {
+        "read": "success",
+        "parse": "success",
+        "validate": "success",
+        "render": "success",
+        "write": "success"
+      },
+      "error_type": null,
+      "error_message": null,
+      "quality_error_type": null,
+      "quality_error_message": null,
+      "timing": {
+        "read_sec": 0.0002,
+        "parse_sec": 79.2475,
+        "validate_sec": 0.0,
+        "render_sec": 0.0001,
+        "write_sec": 0.0045,
+        "total_sec": 79.2523
+      },
+      "parser_metrics": {
+        "is_success": true,
+        "error_type": null,
+        "error_message": null,
+        "attempts": 1,
+        "retries": 0,
+        "request_count": 1,
+        "duration_sec": 79.2474,
+        "repaired_json": false,
+        "usage": {
+          "input_tokens": 2131,
+          "output_tokens": 4643,
+          "total_tokens": 6774
+        }
+      },
+      "validation_report": {
+        "episode_number": 1,
+        "is_valid": true,
+        "errors": [],
+        "warnings": [],
+        "format_score": 100
+      }
+    }
+  ]
+}

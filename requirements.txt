@@ -1,0 +1,8 @@
+openai<3,>=2.30
+pydantic>=2,<3
+PyYAML<7,>=6.0
+alibabacloud-bailian20231229
+httpx
+requests>=2.33,<3
+tavily-python
+pytest-mock

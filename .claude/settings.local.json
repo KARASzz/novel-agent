@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import py_compile; py_compile.compile\\(''rag_engine/tavily_search.py'', doraise=True\\)\")",
+      "WebSearch",
+      "WebFetch(domain:docs.tavily.com)",
+      "Bash(npx -y @brave/brave-search-mcp-server --help)",
+      "Bash(export BRAVE_API_KEY=\"BSAWIQBC4H4xfyUUtk6gjobkW5oORtJ\")",
+      "Bash(npx -y @brave/brave-search-mcp-server --transport stdio)",
+      "Read(//c/Users/KARASz/AppData/Roaming/Claude//**)",
+      "Read(//c/Users/KARASz/AppData/Roaming//**)",
+      "WebFetch(domain:github.com)"
+    ]
+  }
+}

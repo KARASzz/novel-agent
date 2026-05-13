@@ -1,0 +1,61 @@
+[project]
+name = "hongguo-script-maker"
+version = "0.1.0"
+description = "红果剧本一键制造机 - 工业级短剧脚本生产线"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "openai>=1.0.0",
+    "pydantic>=2,<3",
+    "PyYAML>=6.0",
+    "alibabacloud-bailian20231229",
+    "httpx",
+    "requests",
+    "tavily-python",
+    "pytest",
+    "pytest-mock",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# 显式指定需要打包的目录，避免把 logs, drafts 等数据文件夹也当成 Python 包
+packages = [
+    "core_engine",
+    "rag_engine",
+    "scripts",
+    "pre_hub",
+    "pre_hub.artifacts",
+    "pre_hub.layer0_source_guard",
+    "pre_hub.layer1_market_radar",
+    "pre_hub.layer2_audience_modeling",
+    "pre_hub.layer3_router",
+    "pre_hub.layer4_concept_arena",
+    "pre_hub.layer5_narrative_graph",
+    "pre_hub.layer6_adversarial",
+    "pre_hub.layer7_admission",
+    "pre_hub.schemas",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_configs = true
+check_untyped_defs = true
+exclude = "(^\\.venv/|^tests/)"

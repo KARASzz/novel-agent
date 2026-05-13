@@ -1,0 +1,157 @@
+{
+  "episode_number": 1,
+  "title": "渣男退婚，首富归位",
+  "is_paywall": false,
+  "scenes": [
+    {
+      "scene_id": "1-1",
+      "time": "夜",
+      "location_type": "内",
+      "location": "高档酒店宴会厅",
+      "characters": [
+        "林夏",
+        "赵天宇",
+        "林娇",
+        "陈叔"
+      ],
+      "plots": [
+        {
+          "type": "action",
+          "character": null,
+          "content": "一纸退婚协议甩在林夏脸上",
+          "emotion": null,
+          "duration_sec": 3,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "赵天宇",
+          "content": "林夏，签字吧。娇娇才是林家真正的千金，而你，不过是个捡垃圾长大的孤儿。我能跟你订婚，已经是你的福气了。",
+          "emotion": "不屑嘲讽",
+          "duration_sec": 5,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "action",
+          "character": null,
+          "content": "林夏穿着廉价的衣服，安静地站着",
+          "emotion": null,
+          "duration_sec": 2,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "林娇",
+          "content": "夏夏，你别怪天宇哥，实在是你配不上他。天宇哥马上就要升任赵氏总经理了，而你连个像样的包包都买不起。",
+          "emotion": "虚伪假意",
+          "duration_sec": 5,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "action",
+          "character": null,
+          "content": "林夏冷笑一声，没有看协议，而是抬眼扫过全场",
+          "emotion": null,
+          "duration_sec": 3,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "林夏",
+          "content": "赵天宇，你确定要退？",
+          "emotion": "冷静轻蔑",
+          "duration_sec": 2,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "赵天宇",
+          "content": "怎么，你还想赖上我？我告诉你，这卡里有五十万，拿上钱，滚出这座城市！",
+          "emotion": "傲慢威胁",
+          "duration_sec": 4,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "action",
+          "character": null,
+          "content": "林夏拿出手机，拨通一个号码",
+          "emotion": null,
+          "duration_sec": 2,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "林夏",
+          "content": "陈叔，把我名下借给赵氏集团的三个亿过桥资金，十分钟内全部抽回。另外，赵氏下季度的订单，全部取消。",
+          "emotion": "沉稳命令",
+          "duration_sec": 6,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "赵天宇",
+          "content": "几个亿？林夏，你吹牛也不怕闪断舌头！",
+          "emotion": "狂妄讥笑",
+          "duration_sec": 3,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "action",
+          "character": null,
+          "content": "赵天宇的手机突然疯狂震动。他接起电话，脸色瞬间惨白",
+          "emotion": null,
+          "duration_sec": 3,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "赵天宇",
+          "content": "什么？资金链断裂？银行催贷？！",
+          "emotion": "惊恐失措",
+          "duration_sec": 3,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "林娇",
+          "content": "天宇哥，怎么回事？",
+          "emotion": "惊慌失措",
+          "duration_sec": 2,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "action",
+          "character": null,
+          "content": "宴会厅大门被推开，十几个黑衣保镖开路，一名西装革履的老者快步走入，对着林夏深深鞠躬",
+          "emotion": null,
+          "duration_sec": 4,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "陈叔",
+          "content": "顾氏财团唯一继承人，林大小姐，您受委屈了！少爷已经在楼下车里等您！",
+          "emotion": "恭敬尊崇",
+          "duration_sec": 5,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "action",
+          "character": null,
+          "content": "全场死寂。赵天宇和林娇如遭雷击，双腿发软",
+          "emotion": null,
+          "duration_sec": 3,
+          "is_cliffhanger": false
+        },
+        {
+          "type": "dialogue",
+          "character": "林夏",
+          "content": "这五十万，留着给你买棺材吧。",
+          "emotion": "决绝霸气",
+          "duration_sec": 3,
+          "is_cliffhanger": true
+        }
+      ]
+    }
+  ]
+}

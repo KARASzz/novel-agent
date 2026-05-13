@@ -1,0 +1,88 @@
+# 红果短剧工作流配置
+pipeline:
+  max_workers: 3
+  report_json: true
+  file_timeout_sec: 300  # 单文件处理超时上限（秒）
+  rate_limit:
+    # 全局请求节流（每秒请求数）。0 为关闭。
+    requests_per_second: 0
+
+parser:
+  api_key_env: "DASHSCOPE_API_KEY"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen3.6-plus"
+  timeout: 300
+  max_retries: 3
+  strict_validation: true
+  tools:
+    web_search: true
+    web_extractor: true
+    code_interpreter: true
+    file_search: false
+    enable_thinking: true
+  enable_rag: true
+  retry:
+    base_delay_sec: 1.0
+    max_delay_sec: 8.0
+    jitter_sec: 0.25
+
+validator:
+  min_duration_sec: 60
+  max_duration_sec: 150
+  speech_rate: 4.5
+
+scoring:
+  duration_short_penalty: 10
+  duration_long_penalty: 30
+  no_hook_penalty: 15
+  paywall_no_hook_penalty: 40
+  first3_no_hook_penalty: 20
+
+logging:
+  log_level: "INFO"
+
+rag:
+  backend: "bailian"
+  workspace_id_env: "WORKSPACE_ID"
+  index_id_env: "BAILIAN_INDEX_ID"
+  default_query: "短剧编剧通用规范、商业钩子设计、付费点卡点技巧"
+  top_k: 2
+  max_candidates: 120
+  snippet_chars: 500
+  # RAG三库配置
+  triple_kb:
+    market_ttl_days: 30    # 市场时效库30天过期
+    common_ttl_days: 180   # 常识库半年过期
+    project_ttl_days: 0     # 项目库永不过期
+
+# 前置决策中台配置
+pre_hub:
+  # Layer0: 信源净化
+  source_guard:
+    min_published_days: 90  # 禁止使用90天前的数据
+    tiers:
+      official: 0.95
+      mainstream: 0.80
+      third_party: 0.70
+      industry_media: 0.50
+      self_media: 0.30
+
+  # Layer1: 市场雷达
+  market_radar:
+    bayesian_threshold: 0.65  # 新鲜度可接受下限
+
+  # Layer3: 路由决策
+  router:
+    tot_routes: 3  # ToT并行数
+    min_score_threshold: 60  # 最低准入分
+
+  # Layer6: 对抗验证
+  adversarial:
+    must_pass_checks: 8  # 10项检查至少通过8项
+
+  # Layer7: 准入门
+  admission:
+    passport_ttl_days: 14  # 准入护照有效期
+
+cache:
+  parser_result_ttl_days: 180

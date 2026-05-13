@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短剧智能体 - 工业化控制台 V3.0</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .top-panel {
+            display: flex;
+            padding: 20px;
+            gap: 30px;
+        }
+        .ascii-wrapper {
+            background-color: #252526;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            align-self: flex-start; /* Ensures it stays top-left without stretching */
+        }
+        .ascii-art {
+            font-family: Consolas, 'Courier New', monospace;
+            color: #569cd6;
+            white-space: pre;
+            font-size: 13px;
+            line-height: 1.2;
+            text-align: left;
+        }
+        .controls {
+            flex-grow: 1;
+        }
+        .bottom-panel {
+            padding: 0 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        h2 {
+            color: #4ec9b0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+        button {
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-align: left;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #1177bb;
+        }
+        .output-box {
+            background-color: #000;
+            color: #0f0;
+            font-family: Consolas, 'Courier New', monospace;
+            padding: 15px;
+            border-radius: 5px;
+            flex-grow: 1;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid #333;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-panel">
+        <div class="ascii-wrapper">
+            <div class="ascii-art">
+╔════════════════════════════════════════════════════════════╗
+║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
+║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
+║                                                            ║
+║        ██╗  ██╗  ████╗  █████╗    ████╗  ███████╗          ║
+║        ██║ ██╔╝ ██╔═██╗ ██╔═██╗  ██╔═██╗ ██╔════╝          ║
+║        █████╔╝  ██████║ █████╔╝  ██████║ ███████╗          ║
+║        ██╔═██╗  ██╔═██║ ██╔═██╗  ██╔═██╗ ╚════██║          ║
+║        ██║  ██╗ ██║ ██║ ██║  ██║ ██║ ██║ ███████║          ║
+║        ╚═╝  ╚═╝ ╚═╝ ╚═╝ ╚═╝  ╚═╝ ╚═╝ ╚═╝ ╚══════╝          ║
+║                                                            ║
+║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
+║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
+╠════════════════════════════════════════════════════════════╣
+║              ⚛️⚛️【红果剧本一键制造机】⚛️⚛️                ║
+╠════════════════════════════════════════════════════════════╣
+║                   🐉 工业化控制台 V3.0 🐉                  ║
+╚════════════════════════════════════════════════════════════╝
+            </div>
+        </div>
+        
+        <div class="controls">
+            <h2>核心工作流</h2>
+            <div class="btn-group">
+                <button onclick="runCommand('preflight')">🧭 [1] 前置中台评审 (Preflight)</button>
+                <button onclick="runCommand('pipeline')">🚀 [2] 全自动流水线 (Build Scripts)</button>
+                <button onclick="runCommand('feed')">🌾 [3] 知识饲养员 (KB Feed)</button>
+                <button onclick="runCommand('packager')">📦 [4] 投稿打包封装 (Packager)</button>
+                <button onclick="runCommand('full_flow')">🧩 [5] 一键全流程 (PreHub+Build)</button>
+            </div>
+
+            <h2>辅助工具</h2>
+            <div class="btn-group">
+                <button onclick="runCommand('stats')">📊 [6] 查看统计数据 (Show Stats)</button>
+                <button onclick="runCommand('inspire')">🛰️ [7] 灵感探针 (Trend Radar)</button>
+                <button onclick="runCommand('cache')">🧹 [8] 缓存管理 (Cache Tools)</button>
+                <button onclick="runCommand('ltm')">🧠 [9] LTM写回审计 (LTM Review)</button>
+            </div>
+
+            <h2>诊断与测试项</h2>
+            <div class="btn-group">
+                <button onclick="runCommand('diag_rag')">🔎 [10-1] 百炼 RAG 连接诊断</button>
+                <button onclick="runCommand('diag_validator')">🧪 [10-2] 运行格式校验自检</button>
+                <button onclick="runCommand('diag_renderer')">🎨 [10-3] 运行渲染引擎自检</button>
+            </div>
+
+            <h2>系统控制</h2>
+            <div class="btn-group">
+                <button onclick="runCommand('exit')" style="background-color: #8a2be2;">🚪 [0] 关闭网页控制台 (Exit)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-panel">
+        <h2>执行日志</h2>
+        <div class="output-box" id="output">等待操作...</div>
+    </div>
+
+    <script>
+        async function runCommand(cmd) {
+            const outputBox = document.getElementById('output');
+            outputBox.textContent = `[System] 正在启动任务: ${cmd}...\n`;
+            
+            try {
+                const response = await fetch(`/api/run/${cmd}`, { method: 'POST' });
+                const result = await response.json();
+                outputBox.textContent += `\n[Result]\n${result.output}`;
+            } catch (error) {
+                outputBox.textContent += `\n[Error] 请求失败: ${error}`;
+            }
+        }
+    </script>
+</body>
+</html>
