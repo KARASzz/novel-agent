@@ -13,9 +13,9 @@ pipeline:
 
 parser:
   model_slot: "model_slot_1"
-  api_key_env: "MODEL_SLOT_1_API_KEY"
-  base_url: ""
-  model: "model-slot-1"
+  api_key_env: "MINIMAX_API_KEY"
+  base_url: "https://api.minimaxi.com/v1"
+  model: "MiniMax-M2.7"
   timeout: 300
   max_retries: 3
   strict_validation: true
@@ -96,12 +96,12 @@ models:
   default_slot: "model_slot_1"
   slots:
     model_slot_1:
-      display_name: "模型占位 1"
-      base_url: ""
-      api_key_env: "MODEL_SLOT_1_API_KEY"
-      model_id: "model-slot-1"
+      display_name: "MINIMAX"
+      base_url: "https://api.minimaxi.com/v1"
+      api_key_env: "MINIMAX_API_KEY"
+      model_id: "MiniMax-M2.7"
       enabled: true
-      note: "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。"
+      note: "主流 OpenAI 兼容模型，支持高性价比章节生成。"
     model_slot_2:
       display_name: "模型占位 2"
       base_url: ""

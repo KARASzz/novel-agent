@@ -35,10 +35,12 @@ ENV/
 
 # Environment variables / secrets
 .env
+.env.*
 *.env
 
-# Data
+# Data & Knowledge Base
 data/
+knowledge_base/
 *.db
 *.sqlite
 *.sqlite3
@@ -47,11 +49,23 @@ data/
 logs/
 *.log
 
-# Generated reports
-reports/preflight/
-reports/ltm_audit/
+# Project Outputs & Cache
+.cache/
+novel_outputs/
+scripts_output/
+reports/
+output/
+outputs/
+uploads/
+temp/
+tmp/
 
-# Test / cache
+# Drafts / User Inputs
+drafts/*
+!drafts/.gitkeep
+!drafts/README.md
+
+# Test / QA
 .pytest_cache/
 .coverage
 htmlcov/
@@ -61,13 +75,6 @@ htmlcov/
 
 # Docker
 .docker/
-
-# Outputs / temp
-output/
-outputs/
-uploads/
-temp/
-tmp/
 
 # OS
 .DS_Store
