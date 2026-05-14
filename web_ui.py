@@ -141,14 +141,16 @@ async def generated_files():
     return file_catalog.list_files()
 
 
-@app.get("/files/open/{file_id}", response_class=HTMLResponse)
+@app.post("/api/open-file/{file_id}")
 async def open_generated_file(file_id: str):
     try:
-        return HTMLResponse(file_catalog.preview_html(file_id))
+        return file_catalog.open_with_default_app(file_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (PermissionError, ValueError) as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"系统默认打开命令执行失败: {exc}") from exc
 
 
 def _run_mock_chapter(selected_model_slot: str) -> str:

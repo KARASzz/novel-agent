@@ -61,7 +61,7 @@ def test_run_command_passes_model_slot_to_pipeline(monkeypatch):
     assert captured["cmd"][-2:] == ["--model-slot", "model_slot_4"]
 
 
-def test_generated_file_catalog_lists_and_opens_inline(tmp_path):
+def test_generated_file_catalog_lists_default_app_open_url(tmp_path):
     chapter_dir = tmp_path / "novel_outputs" / "p1" / "chapter_001"
     chapter_dir.mkdir(parents=True)
     target = chapter_dir / "chapter.md"
@@ -73,13 +73,33 @@ def test_generated_file_catalog_lists_and_opens_inline(tmp_path):
     file_item = group["files"][0]
 
     assert file_item["name"] == "chapter.md"
-    assert file_item["open_url"].startswith("/files/open/")
-    html = catalog.preview_html(file_item["id"])
-    assert "# 第一章" in html
-    assert "触发浏览器下载" not in html
+    assert file_item["open_url"].startswith("/api/open-file/")
 
 
-def test_open_generated_file_response_is_inline(monkeypatch, tmp_path):
+def test_generated_file_catalog_opens_with_macos_default_app(monkeypatch, tmp_path):
+    chapter_dir = tmp_path / "novel_outputs" / "p1" / "chapter_001"
+    chapter_dir.mkdir(parents=True)
+    target = chapter_dir / "chapter.md"
+    target.write_text("# 第一章\n正文", encoding="utf-8")
+
+    catalog = GeneratedFileCatalog(tmp_path)
+    file_item = next(
+        group["files"][0]
+        for group in catalog.list_files()["groups"]
+        if group["key"] == "novel_outputs"
+    )
+    calls = []
+    monkeypatch.setattr("web_file_catalog.platform.system", lambda: "Darwin")
+    monkeypatch.setattr("web_file_catalog.subprocess.Popen", lambda cmd: calls.append(cmd))
+
+    result = catalog.open_with_default_app(file_item["id"])
+
+    assert result["status"] == "opened"
+    assert result["path"] == str(target.resolve())
+    assert calls == [["open", str(target.resolve())]]
+
+
+def test_open_generated_file_response_uses_default_app(monkeypatch, tmp_path):
     chapter_dir = tmp_path / "novel_outputs" / "p1" / "chapter_001"
     chapter_dir.mkdir(parents=True)
     (chapter_dir / "chapter.md").write_text("正文", encoding="utf-8")
@@ -90,14 +110,28 @@ def test_open_generated_file_response_is_inline(monkeypatch, tmp_path):
         if group["key"] == "novel_outputs"
     )
     monkeypatch.setattr(web_ui, "file_catalog", catalog)
+    monkeypatch.setattr(
+        catalog,
+        "open_with_default_app",
+        lambda received_id: {
+            "status": "opened",
+            "path": str(chapter_dir / "chapter.md"),
+            "name": "chapter.md",
+            "received_id": received_id,
+        },
+    )
 
     import asyncio
 
     response = asyncio.run(web_ui.open_generated_file(file_id))
 
-    assert response.status_code == 200
-    assert "content-disposition" not in response.headers
-    assert "正文".encode("utf-8") in response.body
+    assert response["status"] == "opened"
+    assert response["name"] == "chapter.md"
+    assert response["received_id"] == file_id
+
+
+def test_browser_preview_route_is_not_registered():
+    assert "/files/open/{file_id}" not in {route.path for route in web_ui.app.routes}
 
 
 def test_jinja_templates_are_auto_reload_enabled():

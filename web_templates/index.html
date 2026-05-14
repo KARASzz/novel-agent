@@ -205,6 +205,9 @@
         }
         .open-link {
             align-self: start;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             color: #0b5e95;
             text-decoration: none;
             border: 1px solid #b9d6ec;
@@ -212,6 +215,8 @@
             padding: 6px 8px;
             font-size: 12px;
             background: #f4fbff;
+            min-height: 0;
+            white-space: nowrap;
         }
         .open-link:hover { background: #e6f5ff; }
         .empty {
@@ -251,7 +256,7 @@
         <header class="header">
             <div class="brand">
                 <h1>番茄小说一键制造机</h1>
-                <p>FastAPI + Jinja2 控制台 | 九步章节生产线 | 本地文件清单内联打开</p>
+                <p>FastAPI + Jinja2 控制台 | 九步章节生产线 | 本地文件清单默认应用打开</p>
             </div>
             <div class="reload-badge">
                 {% if dev_reload_enabled %}热刷新已启用{% else %}热刷新未启用{% endif %}
@@ -309,7 +314,7 @@
                                     <div class="file-name">{{ file.name }}</div>
                                     <div class="file-path">{{ file.relative_path }} · {{ file.size_label }} · {{ file.modified_at }}</div>
                                 </div>
-                                <a class="open-link" href="{{ file.open_url }}" target="_blank" rel="noopener">打开</a>
+                                <button class="open-link" type="button" onclick="openGeneratedFile('{{ file.id }}')">本机打开</button>
                             </div>
                             {% endfor %}
                         {% else %}
@@ -388,14 +393,13 @@
                         path.textContent = `${file.relative_path} · ${file.size_label} · ${file.modified_at}`;
                         left.appendChild(name);
                         left.appendChild(path);
-                        const link = document.createElement('a');
-                        link.className = 'open-link';
-                        link.href = file.open_url;
-                        link.target = '_blank';
-                        link.rel = 'noopener';
-                        link.textContent = '打开';
+                        const openButton = document.createElement('button');
+                        openButton.className = 'open-link';
+                        openButton.type = 'button';
+                        openButton.textContent = '本机打开';
+                        openButton.onclick = () => openGeneratedFile(file.id);
                         row.appendChild(left);
-                        row.appendChild(link);
+                        row.appendChild(openButton);
                         details.appendChild(row);
                     }
                 }
@@ -409,6 +413,24 @@
                 renderFiles(await response.json());
             } catch (error) {
                 document.getElementById('fileSummary').textContent = `文件清单读取失败: ${error}`;
+            }
+        }
+
+        async function openGeneratedFile(fileId) {
+            const outputBox = document.getElementById('output');
+            try {
+                const response = await fetch(`/api/open-file/${encodeURIComponent(fileId)}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.detail || '打开失败');
+                }
+                outputBox.textContent += `\n[OpenFile] 已调用本机默认应用打开: ${result.path}`;
+                document.getElementById('lastRun').textContent = `已打开: ${result.name}`;
+            } catch (error) {
+                outputBox.textContent += `\n[OpenFileError] ${error}`;
+                document.getElementById('lastRun').textContent = '文件打开失败';
             }
         }
 
