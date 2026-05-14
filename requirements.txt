@@ -1,11 +1,39 @@
-openai<3,>=2.30
-pydantic>=2,<3
-PyYAML<7,>=6.0
+# 核心依赖
+openai>=2.30,<3
+pydantic>=2.0.0,<3     # 数据验证
+PyYAML>=6.0,<7
 alibabacloud-bailian20231229
-httpx
+httpx>=0.25.0          # HTTP客户端
 requests>=2.33,<3
-tavily-python
-pytest-mock
-fastapi
-uvicorn
-jinja2
+tavily-python>=0.7.24,<0.8 # Tavily联网研究SDK
+fastapi>=0.110.0       # API服务
+uvicorn[standard]>=0.27.0  # ASGI服务器
+jinja2>=3.1.0          # 服务端模板
+openpyxl>=3.1.2        # Excel采集表清洗
+python-multipart>=0.0.9 # 文件上传表单解析
+sqlmodel>=0.0.16       # 任务/步骤结构化存储
+
+# 数据库
+# sqlite3 (Python内置)
+
+# 日志
+loguru>=0.7.0          # 日志库
+
+# 配置
+python-dotenv>=1.0.0   # 环境变量
+pydantic-settings>=2.0.0 # Settings配置
+
+# 测试
+pytest>=7.4.0          # 测试框架
+pytest-mock            # Mock测试
+pytest-asyncio>=0.21.0 # 异步测试
+
+# 类型检查
+mypy>=1.5.0            # 类型检查
+
+# 代码格式化
+black>=23.0.0          # 代码格式化
+isort>=5.12.0          # import排序
+
+# Docker
+# docker>=6.0.0        # Docker SDK (可选)

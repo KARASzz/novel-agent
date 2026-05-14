@@ -632,7 +632,7 @@ class DraftParser:
                 episode=None,
                 is_success=False,
                 error_type=ERROR_CONFIG,
-                error_message=f"Missing model configuration: {missing}",
+                error_message=f"所选模型 ({self.model_slot}) 缺少配置，请在系统中配置其绑定的环境变量: {missing}",
                 attempts=0,
                 retries=0,
                 request_count=0,

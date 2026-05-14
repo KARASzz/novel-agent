@@ -1,4 +1,4 @@
-# 红果剧本制造机 - 全面项目优化清单 (2026.04.04)
+# 番茄小说一键制造机 - 全面项目优化清单 (2026.04.04)
 
 基于对项目所有 23 个核心源码文件、配置文件及启动脚本的深度审查，我为您整理了本份优化清单。
 
@@ -19,7 +19,7 @@
 
 | 优先级 | 优化项 | 说明 |
 | :--- | :--- | :--- |
-| 🟡 **中** | **SHA-256 缓存增强** | [cache_manager.py](file:///d:/+%E7%BA%A2%E6%9E%9C%E5%89%A7%E6%9C%AC%E4%B8%80%E9%94%AE%E5%88%B6%E9%80%A0%E6%9C%BA/core_engine/cache_manager.py) 目前使用 MD5，由于剧本内容可能极长，建议升级为 SHA-256 加盐，并包含 Prompt 版本号，防止 Prompt 修改后误用旧缓存。 |
+| 🟡 **中** | **SHA-256 缓存增强** | [cache_manager.py](file:///d:/+%E7%BA%A2%E6%9E%9C%E5%89%A7%E6%9C%AC%E4%B8%80%E9%94%AE%E5%88%B6%E9%80%A0%E6%9C%BA/core_engine/cache_manager.py) 目前使用 MD5，由于小说章节内容可能极长，建议升级为 SHA-256 加盐，并包含 Prompt 版本号，防止 Prompt 修改后误用旧缓存。 |
 | 🟡 **中** | **更精细的 `max_workers` 管理** | [BatchProcessor](file:///d:/+%E7%BA%A2%E6%9E%9C%E5%89%A7%E6%9C%AC%E4%B8%80%E9%94%AE%E5%88%B6%E9%80%A0%E6%9C%BA/core_engine/batch_processor.py#59-238) 的并发数量目前仅由配置决定。建议根据 API 速率限制（Rate Limit）自动动态调节，避免触发 429 报错。 |
 | 🟢 **低** | **Session Cache 策略优化** | 在 [update_kb.py](file:///d:/+%E7%BA%A2%E6%9E%9C%E5%89%A7%E6%9C%AC%E4%B8%80%E9%94%AE%E5%88%B6%E9%80%A0%E6%9C%BA/core_engine/update_kb.py) 生成长报告时，可以更精确地利用缓存来减少重复 Prompt 消耗的 Token 成本。 |
 
