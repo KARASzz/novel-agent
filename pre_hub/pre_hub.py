@@ -107,9 +107,13 @@ class PreHubOrchestrator:
         route = self._m05_route(capsule, market, author_memory, audience)
         print(f"[Novel Preflight] M05 route: {route.content_lane.value}/{route.format_lane.label}")
 
+        print(f"[Novel Preflight] M06 starting concept arena...")
         branches = self._m06_concept_arena(capsule, market, author_memory, route)
+        print(f"[Novel Preflight] M07 starting narrative seed...")
         narrative = self._m07_narrative_seed(capsule, route, branches)
+        print(f"[Novel Preflight] M08 starting adversarial gate...")
         risk = self._m08_adversarial_gate(capsule, market, route, narrative, risk_signals)
+        print(f"[Novel Preflight] M09 starting admission...")
         passport = self._m09_admission(capsule, market, author_memory, route, narrative, risk)
 
         bundle = ChapterProductionBundle(

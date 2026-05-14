@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,7 +15,11 @@
             --panel: #ffffff;
             --terminal: #111827;
         }
-        * { box-sizing: border-box; }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             background: var(--page);
@@ -22,12 +27,14 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             min-height: 100vh;
         }
+
         .shell {
             display: grid;
             grid-template-columns: minmax(360px, 1.25fr) minmax(360px, 0.85fr);
             gap: 16px;
             padding: 16px;
         }
+
         .header {
             grid-column: 1 / -1;
             background: #182332;
@@ -39,31 +46,40 @@
             justify-content: space-between;
             gap: 16px;
         }
+
         .brand h1 {
             margin: 0;
             font-size: 22px;
             letter-spacing: 0;
         }
+
         .brand p {
             margin: 4px 0 0;
             color: #c6d3dc;
             font-size: 13px;
         }
+
         .reload-badge {
             white-space: nowrap;
-            border: 1px solid rgba(255,255,255,.22);
+            border: 1px solid rgba(255, 255, 255, .22);
             border-radius: 999px;
             padding: 7px 10px;
             font-size: 12px;
             color: #dfe8ee;
         }
-        .workspace, .files, .log-panel {
+
+        .workspace,
+        .files,
+        .log-panel {
             border: 1px solid var(--line);
             border-radius: 8px;
             background: var(--panel);
             overflow: hidden;
         }
-        .workspace-header, .files-header, .log-header {
+
+        .workspace-header,
+        .files-header,
+        .log-header {
             padding: 12px 14px;
             border-bottom: 1px solid var(--line);
             display: flex;
@@ -71,21 +87,25 @@
             justify-content: space-between;
             gap: 12px;
         }
+
         h2 {
             margin: 0;
             font-size: 16px;
             letter-spacing: 0;
         }
+
         .model-panel {
             display: flex;
             align-items: center;
             gap: 8px;
             min-width: 360px;
         }
+
         .model-panel label {
             color: var(--muted);
             font-size: 13px;
         }
+
         select {
             min-width: 230px;
             border: 1px solid #aebbc5;
@@ -95,27 +115,47 @@
             padding: 8px;
             font-size: 13px;
         }
-        .model-hint, .file-meta {
+
+        .model-hint,
+        .file-meta {
             color: var(--muted);
             font-size: 12px;
         }
+
         .module-grid {
             padding: 14px;
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
         }
+
         .module {
-            border: 1px solid rgba(0,0,0,.08);
+            border: 1px solid rgba(0, 0, 0, .08);
             border-radius: 8px;
             padding: 12px;
             min-height: 150px;
         }
-        .module-preflight { background: #fff7df; }
-        .module-chapter { background: #eaf3ff; }
-        .module-knowledge { background: #e9f7ee; }
-        .module-export { background: #f4edff; }
-        .module-system { background: #f3f4f6; }
+
+        .module-preflight {
+            background: #fff7df;
+        }
+
+        .module-chapter {
+            background: #eaf3ff;
+        }
+
+        .module-knowledge {
+            background: #e9f7ee;
+        }
+
+        .module-export {
+            background: #f4edff;
+        }
+
+        .module-system {
+            background: #f3f4f6;
+        }
+
         .module-title {
             display: flex;
             align-items: baseline;
@@ -123,10 +163,12 @@
             gap: 12px;
             margin-bottom: 6px;
         }
+
         .module-title h3 {
             margin: 0;
             font-size: 15px;
         }
+
         .module p {
             min-height: 34px;
             margin: 0 0 10px;
@@ -134,45 +176,56 @@
             font-size: 12px;
             line-height: 1.45;
         }
+
         .orchestrator-dashboard {
             border-top: 1px solid var(--line);
             background: #fbfcfd;
             padding: 14px;
         }
-        .orchestrator-header, .subsection-head {
+
+        .orchestrator-header,
+        .subsection-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 10px;
             margin-bottom: 10px;
         }
+
         .orchestrator-header p {
             margin: 3px 0 0;
             color: var(--muted);
             font-size: 12px;
         }
+
         .ledger-grid {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 8px;
             margin-bottom: 12px;
         }
-        .status-card, .agent-column, .stage6-group {
+
+        .status-card,
+        .agent-column,
+        .stage6-group {
             border: 1px solid #d6dde6;
             border-radius: 8px;
             background: white;
             overflow: hidden;
         }
+
         .status-card {
             padding: 10px;
             min-height: 84px;
         }
+
         .status-card h3 {
             margin: 0 0 6px;
             font-size: 12px;
             color: #5b6974;
             font-weight: 600;
         }
+
         .status-card p {
             min-height: 0;
             margin: 0;
@@ -180,6 +233,7 @@
             font-size: 13px;
             line-height: 1.45;
         }
+
         .status-card ul {
             margin: 0;
             padding-left: 16px;
@@ -187,18 +241,21 @@
             font-size: 12px;
             line-height: 1.45;
         }
+
         .agent-columns {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
             margin-bottom: 12px;
         }
+
         .agent-column h3 {
             margin: 0;
             padding: 9px 10px;
             background: #edf7fb;
             font-size: 13px;
         }
+
         .task-list {
             max-height: 220px;
             overflow: auto;
@@ -206,23 +263,27 @@
             display: grid;
             gap: 6px;
         }
+
         .task-row {
             border: 1px solid #e2e8ee;
             border-radius: 6px;
             padding: 7px;
             background: #fbfdff;
         }
+
         .task-title {
             font-size: 12px;
             color: #17212b;
             line-height: 1.35;
         }
+
         .task-meta {
             margin-top: 4px;
             color: var(--muted);
             font-size: 11px;
             line-height: 1.35;
         }
+
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -233,16 +294,48 @@
             background: #f8fafc;
             color: #334155;
         }
-        .status-completed { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
-        .status-running { background: #fff7dd; border-color: #e7cc72; color: #745414; }
-        .status-failed { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
-        .status-pass { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
-        .status-warning { background: #fff7dd; border-color: #e7cc72; color: #745414; }
-        .status-fail { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
+
+        .status-completed {
+            background: #e8f7ed;
+            border-color: #a9d8b7;
+            color: #18623a;
+        }
+
+        .status-running {
+            background: #fff7dd;
+            border-color: #e7cc72;
+            color: #745414;
+        }
+
+        .status-failed {
+            background: #ffe9ed;
+            border-color: #e0a4ae;
+            color: #8a1f35;
+        }
+
+        .status-pass {
+            background: #e8f7ed;
+            border-color: #a9d8b7;
+            color: #18623a;
+        }
+
+        .status-warning {
+            background: #fff7dd;
+            border-color: #e7cc72;
+            color: #745414;
+        }
+
+        .status-fail {
+            background: #ffe9ed;
+            border-color: #e0a4ae;
+            color: #8a1f35;
+        }
+
         .stage6-board {
             display: grid;
             gap: 8px;
         }
+
         .stage6-group summary {
             cursor: pointer;
             padding: 9px 10px;
@@ -250,11 +343,13 @@
             font-weight: 600;
             font-size: 13px;
         }
+
         .stage6-content {
             padding: 9px 10px;
             display: grid;
             gap: 8px;
         }
+
         .stage-output {
             margin: 0;
             white-space: pre-wrap;
@@ -269,12 +364,14 @@
             max-height: 150px;
             overflow: auto;
         }
+
         .round-row {
             border: 1px solid #e2e8ee;
             border-radius: 6px;
             padding: 8px;
             background: #fff;
         }
+
         .round-head {
             display: flex;
             align-items: center;
@@ -284,21 +381,24 @@
             font-size: 12px;
             font-weight: 600;
         }
+
         .diff-note {
             color: #52616b;
             font-size: 12px;
             line-height: 1.45;
             margin-bottom: 6px;
         }
+
         .commands {
             display: grid;
             grid-template-columns: 1fr;
             gap: 8px;
         }
+
         button {
-            border: 1px solid rgba(0,0,0,.12);
+            border: 1px solid rgba(0, 0, 0, .12);
             border-radius: 6px;
-            background: rgba(255,255,255,.72);
+            background: rgba(255, 255, 255, .72);
             color: var(--ink);
             padding: 9px 10px;
             cursor: pointer;
@@ -309,24 +409,110 @@
             font-size: 13px;
             min-height: 38px;
         }
-        button:hover { background: white; border-color: rgba(0,0,0,.24); }
-        button.danger { background: #ffe8ee; color: #8b1d34; }
+
+        button:hover {
+            background: white;
+            border-color: rgba(0, 0, 0, .24);
+        }
+
+        button.danger {
+            background: #ffe8ee;
+            color: #8b1d34;
+        }
+
         .right-column {
             display: grid;
             grid-template-rows: minmax(320px, 1fr) minmax(220px, .75fr);
             gap: 16px;
         }
+
+        /* 任务指示器样式 */
+        .task-indicator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 16px 24px;
+            margin-bottom: 20px;
+            color: white;
+            display: none; /* 默认隐藏 */
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .task-indicator.active {
+            display: flex;
+        }
+
+        .pulse-icon {
+            width: 12px;
+            height: 12px;
+            background-color: #fff;
+            border-radius: 50%;
+            margin-right: 12px;
+            box-shadow: 0 0 0 rgba(255, 255, 255, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+
+        .task-info {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+
+        .task-label {
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        .task-status-text {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-left: 12px;
+        }
+
+        .task-progress-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            margin-top: 8px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .task-progress-inner {
+            height: 100%;
+            background: #fff;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
         .files-body {
             padding: 12px;
-            max-height: 52vh;
+            flex: 1;
             overflow: auto;
+            min-height: 0;
         }
+
         .file-group {
             border: 1px solid var(--line);
             border-radius: 8px;
             margin-bottom: 10px;
             overflow: hidden;
         }
+
         .file-group summary {
             cursor: pointer;
             padding: 10px 12px;
@@ -334,6 +520,7 @@
             font-weight: 600;
             font-size: 13px;
         }
+
         .file-group .group-desc {
             padding: 0 12px 8px;
             color: var(--muted);
@@ -341,6 +528,7 @@
             background: #f8fafb;
             border-bottom: 1px solid var(--line);
         }
+
         .file-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -348,18 +536,24 @@
             padding: 10px 12px;
             border-top: 1px solid #edf1f4;
         }
-        .file-row:first-of-type { border-top: 0; }
+
+        .file-row:first-of-type {
+            border-top: 0;
+        }
+
         .file-name {
             font-size: 13px;
             color: #17212b;
             overflow-wrap: anywhere;
         }
+
         .file-path {
             margin-top: 3px;
             font-size: 12px;
             color: var(--muted);
             overflow-wrap: anywhere;
         }
+
         .open-link {
             align-self: start;
             display: inline-flex;
@@ -375,17 +569,24 @@
             min-height: 0;
             white-space: nowrap;
         }
-        .open-link:hover { background: #e6f5ff; }
+
+        .open-link:hover {
+            background: #e6f5ff;
+        }
+
         .empty {
             padding: 12px;
             color: var(--muted);
             font-size: 13px;
         }
+
+        .files,
         .log-panel {
             display: flex;
             flex-direction: column;
             min-height: 0;
         }
+
         .output-box {
             margin: 0;
             padding: 14px;
@@ -399,6 +600,7 @@
             min-height: 220px;
             flex: 1;
         }
+
         .modal-backdrop {
             position: fixed;
             inset: 0;
@@ -409,7 +611,11 @@
             padding: 18px;
             z-index: 20;
         }
-        .modal-backdrop[hidden] { display: none; }
+
+        .modal-backdrop[hidden] {
+            display: none;
+        }
+
         .modal-dialog {
             width: min(620px, 100%);
             max-height: min(720px, 88vh);
@@ -421,6 +627,7 @@
             display: flex;
             flex-direction: column;
         }
+
         .modal-head {
             padding: 14px 16px;
             border-bottom: 1px solid var(--line);
@@ -429,11 +636,13 @@
             justify-content: space-between;
             gap: 12px;
         }
+
         .modal-title {
             margin: 0;
             font-size: 17px;
             letter-spacing: 0;
         }
+
         .modal-status {
             white-space: nowrap;
             border-radius: 999px;
@@ -443,29 +652,49 @@
             background: #f8fafc;
             color: #334155;
         }
-        .modal-status.pass { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
-        .modal-status.warning { background: #fff7dd; border-color: #e7cc72; color: #745414; }
-        .modal-status.fail { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
+
+        .modal-status.pass {
+            background: #e8f7ed;
+            border-color: #a9d8b7;
+            color: #18623a;
+        }
+
+        .modal-status.warning {
+            background: #fff7dd;
+            border-color: #e7cc72;
+            color: #745414;
+        }
+
+        .modal-status.fail {
+            background: #ffe9ed;
+            border-color: #e0a4ae;
+            color: #8a1f35;
+        }
+
         .modal-body {
             padding: 14px 16px;
             overflow: auto;
         }
+
         .modal-summary {
             margin: 0 0 12px;
             color: #334155;
             font-size: 13px;
             line-height: 1.5;
         }
+
         .check-list {
             display: grid;
             gap: 8px;
         }
+
         .check-row {
             border: 1px solid #e2e8ee;
             border-radius: 6px;
             padding: 9px 10px;
             background: #fbfdff;
         }
+
         .check-row-head {
             display: flex;
             align-items: center;
@@ -473,23 +702,27 @@
             gap: 10px;
             margin-bottom: 5px;
         }
+
         .check-name {
             font-size: 13px;
             font-weight: 600;
             color: #17212b;
         }
+
         .check-detail {
             color: var(--muted);
             font-size: 12px;
             line-height: 1.45;
             overflow-wrap: anywhere;
         }
+
         .modal-foot {
             padding: 12px 16px;
             border-top: 1px solid var(--line);
             display: flex;
             justify-content: flex-end;
         }
+
         .modal-ok {
             min-width: 88px;
             justify-content: center;
@@ -497,18 +730,45 @@
             color: #ffffff;
             border-color: #17212b;
         }
-        .modal-ok:hover { background: #243241; border-color: #243241; }
+
+        .modal-ok:hover {
+            background: #243241;
+            border-color: #243241;
+        }
+
         @media (max-width: 980px) {
-            .shell { grid-template-columns: 1fr; }
-            .module-grid { grid-template-columns: 1fr; }
-            .ledger-grid { grid-template-columns: 1fr 1fr; }
-            .agent-columns { grid-template-columns: 1fr; }
-            .model-panel { min-width: 0; flex-wrap: wrap; }
-            select { min-width: 100%; }
-            .right-column { grid-template-rows: auto; }
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            .module-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ledger-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .agent-columns {
+                grid-template-columns: 1fr;
+            }
+
+            .model-panel {
+                min-width: 0;
+                flex-wrap: wrap;
+            }
+
+            select {
+                min-width: 100%;
+            }
+
+            .right-column {
+                grid-template-rows: auto;
+            }
         }
     </style>
 </head>
+
 <body>
     <main class="shell">
         <header class="header">
@@ -531,6 +791,23 @@
                 </div>
             </div>
 
+            <!-- 动态任务指示器 -->
+            <div id="taskIndicator" class="task-indicator">
+                <div style="flex: 1;">
+                    <div class="task-info">
+                        <div class="pulse-icon"></div>
+                        <div class="task-label" id="activeTaskLabel">正在执行任务...</div>
+                        <div class="task-status-text" id="activeTaskStatus">后台处理中</div>
+                    </div>
+                    <div class="task-progress-bar">
+                        <div id="taskProgressInner" class="task-progress-inner"></div>
+                    </div>
+                </div>
+                <div style="margin-left: 20px;">
+                    <img src="https://img.icons8.com/ios-glyphs/30/ffffff/dots-loading.png" style="width: 24px; animation: spin 2s linear infinite;"/>
+                </div>
+            </div>
+
             <div class="module-grid">
                 {% for section in sections %}
                 <section class="module {{ section.tone }}">
@@ -540,7 +817,8 @@
                     <p>{{ section.description }}</p>
                     <div class="commands">
                         {% for command in section.commands %}
-                        <button class="{% if command.danger %}danger{% endif %}" onclick="runCommand('{{ command.id }}')">
+                        <button class="{% if command.danger %}danger{% endif %}"
+                            onclick="runCommand('{{ command.id }}')">
                             <span>{{ command.icon }} {{ command.label }}</span>
                             <span>运行</span>
                         </button>
@@ -563,7 +841,9 @@
                 <div class="subsection-head">
                     <h2>Agent 层级与任务状态</h2>
                 </div>
-                <div id="agentChartContainer" style="width: 100%; height: 450px; border: 1px solid #d6dde6; border-radius: 8px; background: white; margin-bottom: 12px; overflow: hidden;"></div>
+                <div id="agentChartContainer"
+                    style="width: 100%; height: 1100px; border: 1px solid #d6dde6; border-radius: 8px; background: white; margin-bottom: 12px; overflow: hidden;">
+                </div>
 
                 <div class="subsection-head">
                     <h2>第6A / 第6B 产物差异</h2>
@@ -587,17 +867,19 @@
                         <summary>{{ group.label }} · {{ group.files|length }}</summary>
                         <div class="group-desc">{{ group.description }}</div>
                         {% if group.files %}
-                            {% for file in group.files %}
-                            <div class="file-row">
-                                <div>
-                                    <div class="file-name">{{ file.name }}</div>
-                                    <div class="file-path">{{ file.relative_path }} · {{ file.size_label }} · {{ file.modified_at }}</div>
-                                </div>
-                                <button class="open-link" type="button" onclick="openGeneratedFile('{{ file.id }}')">本机打开</button>
+                        {% for file in group.files %}
+                        <div class="file-row">
+                            <div>
+                                <div class="file-name">{{ file.name }}</div>
+                                <div class="file-path">{{ file.relative_path }} · {{ file.size_label }} · {{
+                                    file.modified_at }}</div>
                             </div>
-                            {% endfor %}
+                            <button class="open-link" type="button"
+                                onclick="openGeneratedFile('{{ file.id }}')">本机打开</button>
+                        </div>
+                        {% endfor %}
                         {% else %}
-                            <div class="empty">暂无文件</div>
+                        <div class="empty">暂无文件</div>
                         {% endif %}
                     </details>
                     {% endfor %}
@@ -614,7 +896,8 @@
         </aside>
     </main>
 
-    <div class="modal-backdrop" id="selfCheckModal" hidden role="dialog" aria-modal="true" aria-labelledby="selfCheckTitle">
+    <div class="modal-backdrop" id="selfCheckModal" hidden role="dialog" aria-modal="true"
+        aria-labelledby="selfCheckTitle">
         <section class="modal-dialog">
             <div class="modal-head">
                 <h2 class="modal-title" id="selfCheckTitle">初始化自检</h2>
@@ -724,17 +1007,17 @@
                         let strokeCol = statusColorMap[status] || statusColorMap['pending'];
                         let textCol = statusTextColorMap[status] || statusTextColorMap['pending'];
                         let bgCol = statusBgColorMap[status] || statusBgColorMap['pending'];
-                        let shortTitle = task.title.length > 12 ? task.title.substring(0, 11) + '...' : task.title;
+                        let shortTitle = task.title.length > 10 ? task.title.substring(0, 9) + '...' : task.title;
 
                         levelNode.children.push({
-                            name: `${task.task_id}\n${shortTitle}`,
+                            name: shortTitle,
                             value: task.status,
                             itemStyle: { color: bgCol, borderColor: strokeCol, borderWidth: 1.5 },
-                            label: { color: textCol, fontSize: 11, lineHeight: 15 },
-                            symbolSize: [120, 44],
+                            label: { color: textCol, fontSize: 11, lineHeight: 12 },
+                            symbolSize: [120, 26],
                             symbol: 'roundRect',
                             tooltip: {
-                                formatter: function() {
+                                formatter: function () {
                                     return `<b>${task.title}</b><br/>ID: ${task.task_id}<br/>Manager: ${task.manager || 'N/A'}<br/>Worker: ${task.worker || 'N/A'}<br/>Status: ${status}<br/>Retries: ${task.retry_count || 0}`;
                                 }
                             }
@@ -876,11 +1159,26 @@
             const body = document.getElementById('filesBody');
             const summary = document.getElementById('fileSummary');
             summary.textContent = `${payload.total_files || 0} 个文件 · ${payload.generated_at || ''}`;
+            
+            const openStates = {};
+            body.querySelectorAll('details.file-group').forEach(details => {
+                const summaryEl = details.querySelector('summary');
+                if (summaryEl) {
+                    const label = summaryEl.textContent.split(' · ')[0];
+                    openStates[label] = details.open;
+                }
+            });
+
             body.innerHTML = '';
             for (const group of payload.groups || []) {
                 const details = document.createElement('details');
                 details.className = 'file-group';
-                details.open = true;
+                if (openStates.hasOwnProperty(group.label)) {
+                    details.open = openStates[group.label];
+                } else {
+                    details.open = true;
+                }
+                
                 const summaryEl = document.createElement('summary');
                 summaryEl.textContent = `${group.label} · ${(group.files || []).length}`;
                 details.appendChild(summaryEl);
@@ -988,7 +1286,7 @@
             document.getElementById('lastRun').textContent = '执行中: init_self_check';
             outputBox.textContent = '[System] 正在执行一键初始化自检...\n';
             try {
-                const response = await fetch('/api/initialization-self-check', {method: 'POST'});
+                const response = await fetch('/api/initialization-self-check', { method: 'POST' });
                 const payload = await response.json();
                 renderSelfCheckModal(payload);
                 outputBox.textContent += `\n[Result]\n${payload.title}\n${payload.summary}`;
@@ -998,7 +1296,7 @@
                     status: 'fail',
                     title: '初始化自检请求失败',
                     summary: String(error),
-                    checks: [{name: '前端请求', status: 'fail', detail: String(error)}]
+                    checks: [{ name: '前端请求', status: 'fail', detail: String(error) }]
                 };
                 renderSelfCheckModal(payload);
                 outputBox.textContent += `\n[Error] 请求失败: ${error}`;
@@ -1013,17 +1311,65 @@
             }
             const outputBox = document.getElementById('output');
             const modelSlot = document.getElementById('modelSelect').value;
+            let payload = { model_slot: modelSlot };
+
+            if (cmd === 'preflight' || cmd === 'full_flow') {
+                const topic = prompt("请输入新书题材或关键词（例如：末日 囤物资 腹黑）：", "赛博朋克 剑修 杀伐果断");
+                if (!topic) {
+                    outputBox.textContent += `\n[System] 已取消操作。`;
+                    return;
+                }
+                payload.topic = topic;
+            }
+
+            const indicator = document.getElementById('taskIndicator');
+            const indicatorLabel = document.getElementById('activeTaskLabel');
+            const indicatorStatus = document.getElementById('activeTaskStatus');
+            const progressInner = document.getElementById('taskProgressInner');
+
+            indicator.classList.add('active');
+            indicatorLabel.textContent = `正在生成: ${cmd === 'produce_chapter' ? '真实第一章正文' : cmd}`;
+            indicatorStatus.textContent = '初始化流水线...';
+            progressInner.style.width = '10%';
+
             document.getElementById('lastRun').textContent = `执行中: ${cmd}`;
             outputBox.textContent = `[System] 正在启动任务: ${cmd}\n[ModelSlot] ${modelSlot}\n`;
 
             try {
                 const response = await fetch(`/api/run/${cmd}`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({model_slot: modelSlot})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
-                const result = await response.json();
-                outputBox.textContent += `\n[Result]\n${result.output}`;
+                
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    const result = await response.json();
+                    outputBox.textContent += `\n[Result]\n${result.output}`;
+                    indicator.classList.remove('active');
+                } else {
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder("utf-8");
+                    let stepCount = 0;
+                    outputBox.textContent += `\n[Result]\n`;
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const chunk = decoder.decode(value, { stream: true });
+                        outputBox.textContent += chunk;
+                        outputBox.scrollTop = outputBox.scrollHeight;
+
+                        // 动态进度条：捕捉 Orchestrator 日志
+                        if (chunk.includes('Running Task:')) {
+                            stepCount++;
+                            const progress = Math.min(95, 10 + (stepCount * 3.5)); // 28步，大约每步3.5%
+                            progressInner.style.width = `${progress}%`;
+                            indicatorStatus.textContent = `第 ${stepCount}/28 步：${chunk.split('Running Task:')[1].split(' - ')[1]?.split('...')[0] || '处理中'}`;
+                        }
+                    }
+                    indicator.classList.remove('active');
+                }
+                
                 document.getElementById('lastRun').textContent = `完成: ${cmd}`;
                 await loadGeneratedFiles();
             } catch (error) {
@@ -1044,4 +1390,5 @@
         setInterval(loadOrchestratorStatus, 5000);
     </script>
 </body>
+
 </html>

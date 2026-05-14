@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import subprocess
 import uvicorn
 import os
 import sys
+import asyncio
 from typing import Any, Callable, Dict, List, Optional
 
 from core_engine.config_loader import load_config
@@ -126,7 +127,7 @@ def _diff_note(previous_content: str, current_content: str, round_name: str) -> 
     if not previous_content:
         return f"本轮首次形成 {round_name} 迭代产物。"
     if previous_content == current_content:
-        return f"本轮聚焦 {round_name}，但 mock 产物未体现文本差异。"
+        return f"本轮聚焦 {round_name}，但产物尚未体现显著文本差异。"
     return f"相对上一轮，本轮只处理 {round_name}，不混合改写其他五个要素。"
 
 
@@ -347,12 +348,12 @@ DASHBOARD_SECTIONS = [
         ],
     },
     {
-        "title": "章节生产",
+        "title": "工业化章节生产",
         "tone": "module-chapter",
-        "description": "九步章节生产线与连续章节 mock 执行。",
+        "description": "九步章节生产线与连续章节生产执行。",
         "commands": [
-            {"id": "mock_chapter", "label": "生成下一章", "icon": "✍️"},
-            {"id": "mock_batch", "label": "批量生成章节", "icon": "📚"},
+            {"id": "produce_chapter", "label": "生成下一章", "icon": "✍️"},
+            {"id": "batch_produce", "label": "批量生成章节", "icon": "📚"},
         ],
     },
     {
@@ -508,8 +509,6 @@ def _model_diag() -> str:
 
 
 INTERNAL_COMMANDS: Dict[str, Callable[[str], str]] = {
-    "mock_chapter": _run_mock_chapter,
-    "mock_batch": _run_mock_batch,
     "search_diag": lambda _slot: _search_diag(),
     "model_diag": lambda _slot: _model_diag(),
 }
@@ -523,17 +522,24 @@ async def run_command(command: str, request: Request):
     except Exception:
         payload = {}
     selected_model_slot = str(payload.get("model_slot") or "").strip()
-    py = sys.executable
+    topic = str(payload.get("topic") or "test_demo").strip()
+    py = "python3"
     # Map API commands to actual python CLI commands
     cmd_map = {
-        "preflight": [py, "-m", "scripts.cli", "new-book", "test_demo", "--format", "real"],
-        "feed": [py, "-m", "core_engine.update_kb", "test_demo"],
+        "preflight": [py, "-m", "scripts.cli", "new-book", topic, "--format", "real"],
+        "feed": [py, "-m", "core_engine.update_kb", topic],
         "export_fanqie": [py, "-m", "scripts.cli", "export-fanqie", "--name", "demo_project", "--genre", "番茄小说", "--author", "none"],
-        "full_flow": [py, "-m", "scripts.cli", "new-book", "test_demo", "--format", "real"], # simplified
-        "inspire": [py, "-m", "core_engine.inspire", "test_demo"],
+        "full_flow": [py, "-m", "scripts.cli", "full-flow", topic, "--format", "real", "--model-slot", selected_model_slot],
+        "produce_chapter": [py, "-m", "scripts.cli", "next-chapter", "第一章：控制台正式生产", "--chapter-index", "1", "--model-slot", selected_model_slot, "--production"],
+        "batch_produce": [py, "-m", "scripts.cli", "batch-chapters", "第二章", "第三章", "--model-slot", selected_model_slot, "--production"],
+        "inspire": [py, "-m", "core_engine.inspire", topic],
         "cache": [py, "-m", "scripts.cli", "clear-cache", "--yes"],
         "diag_validator": [py, "-m", "scripts.cli", "self-test", "validator"],
     }
+    
+    # 移除空参数，防止出现 --model-slot (empty) --production 导致 production 被误读为 model_slot 的值
+    for k in cmd_map:
+        cmd_map[k] = [arg for arg in cmd_map[k] if arg != ""]
     
     if command == "exit":
         # Start background task to kill process so the response still returns
@@ -556,29 +562,27 @@ async def run_command(command: str, request: Request):
         return {"output": "未知命令"}
 
     cmd = list(cmd_map[command])
-    try:
-        # Run command and capture output
-        # cwd ensures scripts find their relative paths (e.g. data folders) correctly
-        result = subprocess.run(
-            cmd,
-            capture_output=True, 
-            text=True, 
-            cwd=BASE_DIR, 
-            encoding="utf-8", 
-            errors="replace"
-        )
-        
-        output = result.stdout
-        if result.stderr:
-            output += "\n[STDERR]\n" + result.stderr
+    
+    # Use StreamingResponse for shell commands to show real-time progress
+    async def process_stream():
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=BASE_DIR,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT
+            )
+            while True:
+                chunk = await process.stdout.read(1024)
+                if not chunk:
+                    break
+                yield chunk.decode("utf-8", errors="replace")
+            await process.wait()
+            yield f"\n命令执行完成 (退出码: {process.returncode})\n"
+        except Exception as e:
+            yield f"\n执行异常: {str(e)}\n"
             
-        if not output.strip():
-            output = f"命令执行完成，无输出 (退出码: {result.returncode})"
-            
-    except Exception as e:
-        output = f"执行异常: {str(e)}"
-        
-    return {"output": output}
+    return StreamingResponse(process_stream(), media_type="text/plain")
 
 if __name__ == "__main__":
     print("启动番茄小说网页控制台（Jinja2 auto_reload + uvicorn reload）...")

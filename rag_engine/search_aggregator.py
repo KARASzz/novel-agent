@@ -57,13 +57,18 @@ class SearchAggregator:
         if not self.enable_brave:
             self.fallback_reasons.append("brave_disabled")
             return []
-        if not os.getenv("BRAVE_SEARCH_API_KEY"):
+        
+        api_key = os.getenv("BRAVE_SEARCH_API_KEY") or os.getenv("BRAVE_API_KEY")
+        if not api_key:
             self.fallback_reasons.append("missing_env:BRAVE_SEARCH_API_KEY")
             return []
+            
         try:
             from rag_engine.brave_search import BraveSearcher
-
-            return BraveSearcher().search_hot_trends(query, max_results=max_results)
+            print(f"DEBUG: Starting Brave Search for query: {query}")
+            results = BraveSearcher(api_key=api_key).search_hot_trends(query, max_results=max_results)
+            print(f"DEBUG: Brave Search completed, found {len(results)} results")
+            return results
         except Exception as exc:
             self.fallback_reasons.append(f"brave_failed:{type(exc).__name__}")
             logger.warning("Brave search failed: %s", exc)
@@ -73,13 +78,18 @@ class SearchAggregator:
         if not self.enable_tavily:
             self.fallback_reasons.append("tavily_disabled")
             return []
-        if not os.getenv("TAVILY_API_KEY"):
+            
+        api_key = os.getenv("TAVILY_API_KEY") or os.getenv("TAVILY_SEARCH_API_KEY")
+        if not api_key:
             self.fallback_reasons.append("missing_env:TAVILY_API_KEY")
             return []
+            
         try:
             from rag_engine.tavily_search import TavilySearcher
-
-            return TavilySearcher().search_hot_trends(query, max_results=max_results)
+            print(f"DEBUG: Starting Tavily Search for query: {query}")
+            results = TavilySearcher(api_key=api_key).search_hot_trends(query, max_results=max_results)
+            print(f"DEBUG: Tavily Search completed, found {len(results)} results")
+            return results
         except Exception as exc:
             self.fallback_reasons.append(f"tavily_failed:{type(exc).__name__}")
             logger.warning("Tavily search failed: %s", exc)

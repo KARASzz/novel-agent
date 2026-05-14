@@ -51,6 +51,33 @@ def _new_book_command(
     return run_preflight(argv)
 
 
+def _full_flow_command(
+    topic: str,
+    format_lane: str,
+    author: str,
+    no_rag: bool,
+    model_slot: str,
+) -> int:
+    exit_code = _new_book_command(
+        topic=topic,
+        format_lane=format_lane,
+        author=author,
+        no_rag=no_rag,
+    )
+    if exit_code != 0:
+        print("❌ 前置立项未通过，终止后续大纲生成。")
+        return exit_code
+        
+    print("\n✅ 前置立项通过，即将进入大纲中台...")
+    from scripts.outline_generator import generate_outline_and_setting
+    try:
+        generate_outline_and_setting(model_slot=model_slot, topic=topic)
+    except Exception as e:
+        print(f"❌ 大纲与设定集生成失败: {e}")
+        return 1
+    return 0
+
+
 def _next_chapter_command(
     title: str,
     chapter_index: int,
@@ -58,22 +85,47 @@ def _next_chapter_command(
     previous_writeback: str,
     model_slot: Optional[str],
     output_root: str,
+    production: bool = False,
 ) -> int:
     from chapter_pipeline import ChapterOrchestrator, ChapterPipelineInput
+    from scripts.outline_generator import get_model_credentials
+    from core_engine.llm_client import LLMClient
 
-    output = ChapterOrchestrator().run_mock_chapter(
-        project_goal="番茄小说章节生产",
-        chapter_input=ChapterPipelineInput(
-            project_bundle={"project_id": project_id, "project_title": project_id},
-            current_chapter=title,
-            previous_chapter_writeback=previous_writeback,
-            local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
-            search_summary="CLI: 搜索摘要占位。",
-            chapter_index=chapter_index,
-            model_slot=model_slot or "",
-        ),
-        output_root=output_root,
+    orchestrator = ChapterOrchestrator()
+    chapter_input = ChapterPipelineInput(
+        project_bundle={"project_id": project_id, "project_title": project_id},
+        current_chapter=title,
+        previous_chapter_writeback=previous_writeback,
+        local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
+        search_summary="CLI: 搜索摘要占位。",
+        chapter_index=chapter_index,
+        model_slot=model_slot or "",
     )
+
+    if production:
+        if not model_slot:
+            print("❌ 生产模式必须指定 --model-slot")
+            return 1
+        try:
+            base_url, model_id, api_key = get_model_credentials(model_slot)
+            client = LLMClient(api_key=api_key, base_url=base_url)
+            orchestrator.llm_client = client
+            output = orchestrator.run_production_chapter(
+                project_goal="番茄小说章节生产",
+                chapter_input=chapter_input,
+                model_id=model_id,
+                output_root=output_root,
+            )
+        except Exception as e:
+            print(f"❌ 章节生产失败: {e}")
+            return 1
+    else:
+        output = orchestrator.run_standard_chapter(
+            project_goal="番茄小说章节生产",
+            chapter_input=chapter_input,
+            output_root=output_root,
+        )
+    
     print(json.dumps(output.to_dict(), ensure_ascii=False, indent=2))
     return 0
 
@@ -85,20 +137,46 @@ def _batch_chapters_command(
     previous_writeback: str,
     model_slot: Optional[str],
     output_root: str,
+    production: bool = False,
 ) -> int:
     from chapter_pipeline import ChapterOrchestrator
+    from scripts.outline_generator import get_model_credentials
+    from core_engine.llm_client import LLMClient
 
-    outputs = ChapterOrchestrator().run_mock_batch(
-        project_goal="番茄小说章节生产",
-        chapter_titles=titles,
-        project_bundle={"project_id": project_id, "project_title": project_id},
-        initial_previous_writeback=previous_writeback,
-        local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
-        search_summary="CLI: 搜索摘要占位。",
-        output_root=output_root,
-        model_slot=model_slot or "",
-        start_index=start_index,
-    )
+    orchestrator = ChapterOrchestrator()
+    if production:
+        if not model_slot:
+            print("❌ 批量生产模式必须指定 --model-slot")
+            return 1
+        try:
+            base_url, model_id, api_key = get_model_credentials(model_slot)
+            orchestrator.llm_client = LLMClient(api_key=api_key, base_url=base_url)
+            outputs = orchestrator.run_production_batch(
+                project_goal="番茄小说批量生产",
+                chapter_titles=titles,
+                project_bundle={"project_id": project_id, "project_title": project_id},
+                initial_previous_writeback=previous_writeback,
+                local_kb_reference="CLI: 批量生产模式下由 Orchestrator 内部维护 RAG。",
+                search_summary="CLI: 批量生产模式下由 Orchestrator 内部维护搜索。",
+                model_id=model_id,
+                output_root=output_root,
+                start_index=start_index,
+            )
+        except Exception as e:
+            print(f"❌ 批量生产失败: {e}")
+            return 1
+    else:
+        outputs = orchestrator.run_standard_batch(
+            project_goal="番茄小说批量生产",
+            chapter_titles=titles,
+            project_bundle={"project_id": project_id, "project_title": project_id},
+            initial_previous_writeback=previous_writeback,
+            local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
+            search_summary="CLI: 搜索摘要占位。",
+            output_root=output_root,
+            model_slot=model_slot or "",
+            start_index=start_index,
+        )
     print(json.dumps([item.to_dict() for item in outputs], ensure_ascii=False, indent=2))
     return 0
 
@@ -176,21 +254,36 @@ def build_parser() -> argparse.ArgumentParser:
     new_book_parser.add_argument("--output", "-o", help="额外保存 Markdown 报告到指定路径")
     new_book_parser.add_argument("--save-bundle", help="保存 ContextBundle JSON 到指定目录或文件")
 
-    next_parser = subparsers.add_parser("next-chapter", help="生成下一章 mock 产物并写入 novel_outputs")
+    full_flow_parser = subparsers.add_parser("full-flow", help="一键立项并全自动生成大纲与设定集")
+    full_flow_parser.add_argument("topic", help="项目题材/关键词")
+    full_flow_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["real", "ai", "mixed"],
+        default="real",
+        help="章节形态: real=正文连载型, ai=设定辅助型, mixed=混合增强型",
+    )
+    full_flow_parser.add_argument("--author", default="default", help="作者ID")
+    full_flow_parser.add_argument("--no-rag", action="store_true", help="禁用搜索聚合，仅使用本地知识库")
+    full_flow_parser.add_argument("--model-slot", required=True, help="模型槽位，用于生成大纲")
+
+    next_parser = subparsers.add_parser("next-chapter", help="生成下一章章节产物并写入 novel_outputs")
     next_parser.add_argument("title", help="当前章标题，例如 第一章：旧城来信")
     next_parser.add_argument("--chapter-index", type=int, default=1, help="章节序号")
-    next_parser.add_argument("--project-id", default="cli_demo", help="项目ID/书名 slug")
-    next_parser.add_argument("--previous-writeback", default="新书开局，无上一章回写。", help="上一章第9步回写")
+    next_parser.add_argument("--project-id", default="console_demo", help="项目ID")
+    next_parser.add_argument("--previous-writeback", default="", help="上一章回写")
     next_parser.add_argument("--model-slot", help="模型槽位")
-    next_parser.add_argument("--output-root", default="novel_outputs", help="输出目录")
+    next_parser.add_argument("--output-root", default="novel_outputs", help="输出根目录")
+    next_parser.add_argument("--production", action="store_true", help="启用真实模型生产")
 
-    batch_parser = subparsers.add_parser("batch-chapters", help="批量生成章节 mock 产物")
+    batch_parser = subparsers.add_parser("batch-chapters", help="批量生成章节产物")
     batch_parser.add_argument("titles", nargs="+", help="章节标题列表")
     batch_parser.add_argument("--project-id", default="cli_demo", help="项目ID/书名 slug")
     batch_parser.add_argument("--start-index", type=int, default=1, help="起始章节序号")
     batch_parser.add_argument("--previous-writeback", default="新书开局，无上一章回写。", help="第一章前置回写")
     batch_parser.add_argument("--model-slot", help="模型槽位")
     batch_parser.add_argument("--output-root", default="novel_outputs", help="输出目录")
+    batch_parser.add_argument("--production", action="store_true", help="启用真实模型生产")
 
     search_parser = subparsers.add_parser("search-diagnose", help="搜索诊断：Brave/Tavily/本地知识库聚合")
     search_parser.add_argument("query", help="搜索关键词")
@@ -238,6 +331,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             save_bundle=args.save_bundle,
         )
 
+    if args.command == "full-flow":
+        return _full_flow_command(
+            topic=args.topic,
+            format_lane=args.format,
+            author=args.author,
+            no_rag=args.no_rag,
+            model_slot=args.model_slot,
+        )
+
     if args.command == "next-chapter":
         return _next_chapter_command(
             title=args.title,
@@ -246,6 +348,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             previous_writeback=args.previous_writeback,
             model_slot=args.model_slot,
             output_root=args.output_root,
+            production=args.production,
         )
 
     if args.command == "batch-chapters":
@@ -256,6 +359,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             previous_writeback=args.previous_writeback,
             model_slot=args.model_slot,
             output_root=args.output_root,
+            production=args.production,
         )
 
     if args.command == "search-diagnose":
