@@ -5,179 +5,330 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>番茄小说一键制造机 - 控制台</title>
     <style>
+        :root {
+            --page: #eef2f1;
+            --ink: #1d2830;
+            --muted: #60707b;
+            --line: #cbd6dc;
+            --panel: #ffffff;
+            --terminal: #111827;
+        }
+        * { box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            background: var(--page);
+            color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            min-height: 100vh;
         }
-        .top-panel {
-            display: flex;
-            padding: 20px;
-            gap: 30px;
+        .shell {
+            display: grid;
+            grid-template-columns: minmax(360px, 1.25fr) minmax(360px, 0.85fr);
+            gap: 16px;
+            padding: 16px;
         }
-        .ascii-wrapper {
-            background-color: #252526;
-            padding: 15px 25px;
+        .header {
+            grid-column: 1 / -1;
+            background: #182332;
+            color: white;
             border-radius: 8px;
-            border: 1px solid #333;
-            align-self: flex-start; /* Ensures it stays top-left without stretching */
-        }
-        .ascii-art {
-            font-family: Consolas, 'Courier New', monospace;
-            color: #569cd6;
-            white-space: pre;
-            font-size: 13px;
-            line-height: 1.2;
-            text-align: left;
-        }
-        .controls {
-            flex-grow: 1;
-        }
-        .bottom-panel {
-            padding: 0 20px 20px 20px;
+            padding: 14px 16px;
             display: flex;
-            flex-direction: column;
-            flex-grow: 1;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .brand h1 {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: 0;
+        }
+        .brand p {
+            margin: 4px 0 0;
+            color: #c6d3dc;
+            font-size: 13px;
+        }
+        .reload-badge {
+            white-space: nowrap;
+            border: 1px solid rgba(255,255,255,.22);
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 12px;
+            color: #dfe8ee;
+        }
+        .workspace, .files, .log-panel {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            overflow: hidden;
+        }
+        .workspace-header, .files-header, .log-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
         h2 {
-            color: #4ec9b0;
-            border-bottom: 1px solid #333;
-            padding-bottom: 5px;
-            margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 18px;
+            margin: 0;
+            font-size: 16px;
+            letter-spacing: 0;
         }
         .model-panel {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin: 0 0 18px 0;
-            padding: 10px 12px;
-            background: #252526;
-            border: 1px solid #333;
-            border-radius: 6px;
+            gap: 8px;
+            min-width: 360px;
         }
         .model-panel label {
-            color: #dcdcaa;
+            color: var(--muted);
             font-size: 13px;
         }
-        .model-panel select {
-            min-width: 260px;
-            background: #111;
-            color: #d4d4d4;
-            border: 1px solid #444;
-            border-radius: 4px;
+        select {
+            min-width: 230px;
+            border: 1px solid #aebbc5;
+            border-radius: 6px;
+            background: white;
+            color: var(--ink);
             padding: 8px;
             font-size: 13px;
         }
-        .model-panel span {
-            color: #858585;
+        .model-hint, .file-meta {
+            color: var(--muted);
             font-size: 12px;
         }
-        .btn-group {
+        .module-grid {
+            padding: 14px;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
-            margin-bottom: 25px;
+        }
+        .module {
+            border: 1px solid rgba(0,0,0,.08);
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 150px;
+        }
+        .module-preflight { background: #fff7df; }
+        .module-chapter { background: #eaf3ff; }
+        .module-knowledge { background: #e9f7ee; }
+        .module-export { background: #f4edff; }
+        .module-system { background: #f3f4f6; }
+        .module-title {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .module-title h3 {
+            margin: 0;
+            font-size: 15px;
+        }
+        .module p {
+            min-height: 34px;
+            margin: 0 0 10px;
+            color: #52616b;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .commands {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
         }
         button {
-            background-color: #0e639c;
-            color: white;
-            border: none;
-            padding: 10px 12px;
-            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,.12);
+            border-radius: 6px;
+            background: rgba(255,255,255,.72);
+            color: var(--ink);
+            padding: 9px 10px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
             font-size: 13px;
-            text-align: left;
-            transition: background-color 0.2s;
+            min-height: 38px;
         }
-        button:hover {
-            background-color: #1177bb;
+        button:hover { background: white; border-color: rgba(0,0,0,.24); }
+        button.danger { background: #ffe8ee; color: #8b1d34; }
+        .right-column {
+            display: grid;
+            grid-template-rows: minmax(320px, 1fr) minmax(220px, .75fr);
+            gap: 16px;
+        }
+        .files-body {
+            padding: 12px;
+            max-height: 52vh;
+            overflow: auto;
+        }
+        .file-group {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .file-group summary {
+            cursor: pointer;
+            padding: 10px 12px;
+            background: #f8fafb;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .file-group .group-desc {
+            padding: 0 12px 8px;
+            color: var(--muted);
+            font-size: 12px;
+            background: #f8fafb;
+            border-bottom: 1px solid var(--line);
+        }
+        .file-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            padding: 10px 12px;
+            border-top: 1px solid #edf1f4;
+        }
+        .file-row:first-of-type { border-top: 0; }
+        .file-name {
+            font-size: 13px;
+            color: #17212b;
+            overflow-wrap: anywhere;
+        }
+        .file-path {
+            margin-top: 3px;
+            font-size: 12px;
+            color: var(--muted);
+            overflow-wrap: anywhere;
+        }
+        .open-link {
+            align-self: start;
+            color: #0b5e95;
+            text-decoration: none;
+            border: 1px solid #b9d6ec;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: #f4fbff;
+        }
+        .open-link:hover { background: #e6f5ff; }
+        .empty {
+            padding: 12px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .log-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         .output-box {
-            background-color: #000;
-            color: #0f0;
-            font-family: Consolas, 'Courier New', monospace;
-            padding: 15px;
-            border-radius: 5px;
-            flex-grow: 1;
-            overflow-y: auto;
+            margin: 0;
+            padding: 14px;
+            background: var(--terminal);
+            color: #c6f6d5;
+            font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+            font-size: 12px;
+            line-height: 1.55;
             white-space: pre-wrap;
-            border: 1px solid #333;
-            font-size: 13px;
-            margin-top: 10px;
+            overflow: auto;
+            min-height: 220px;
+            flex: 1;
+        }
+        @media (max-width: 980px) {
+            .shell { grid-template-columns: 1fr; }
+            .module-grid { grid-template-columns: 1fr; }
+            .model-panel { min-width: 0; flex-wrap: wrap; }
+            select { min-width: 100%; }
+            .right-column { grid-template-rows: auto; }
         }
     </style>
 </head>
 <body>
-    <div class="top-panel">
-        <div class="ascii-wrapper">
-            <div class="ascii-art">
-╔════════════════════════════════════════════════════════════╗
-║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
-║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
-║                                                            ║
-║        ██╗  ██╗  ████╗  █████╗    ████╗  ███████╗          ║
-║        ██║ ██╔╝ ██╔═██╗ ██╔═██╗  ██╔═██╗ ██╔════╝          ║
-║        █████╔╝  ██████║ █████╔╝  ██████║ ███████╗          ║
-║        ██╔═██╗  ██╔═██║ ██╔═██╗  ██╔═██╗ ╚════██║          ║
-║        ██║  ██╗ ██║ ██║ ██║  ██║ ██║ ██║ ███████║          ║
-║        ╚═╝  ╚═╝ ╚═╝ ╚═╝ ╚═╝  ╚═╝ ╚═╝ ╚═╝ ╚══════╝          ║
-║                                                            ║
-║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
-║  ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧  ║
-╠════════════════════════════════════════════════════════════╣
-║              ⚛️⚛️【番茄小说一键制造机】⚛️⚛️                ║
-╠════════════════════════════════════════════════════════════╣
-║                   🐉 工业化控制台 V3.0 🐉                  ║
-╚════════════════════════════════════════════════════════════╝
+    <main class="shell">
+        <header class="header">
+            <div class="brand">
+                <h1>番茄小说一键制造机</h1>
+                <p>FastAPI + Jinja2 控制台 | 九步章节生产线 | 本地文件清单内联打开</p>
             </div>
-        </div>
-        
-        <div class="controls">
-            <div class="model-panel">
-                <label for="modelSelect">模型槽位</label>
-                <select id="modelSelect"></select>
-                <span id="modelHint">读取模型配置中...</span>
+            <div class="reload-badge">
+                {% if dev_reload_enabled %}热刷新已启用{% else %}热刷新未启用{% endif %}
+            </div>
+        </header>
+
+        <section class="workspace">
+            <div class="workspace-header">
+                <h2>工作模块</h2>
+                <div class="model-panel">
+                    <label for="modelSelect">模型槽位</label>
+                    <select id="modelSelect"></select>
+                    <span id="modelHint" class="model-hint">读取模型配置中...</span>
+                </div>
             </div>
 
-            <h2>核心工作流</h2>
-            <div class="btn-group">
-                <button onclick="runCommand('preflight')">🧭 [1] 前置中台评审 (Preflight)</button>
-                <button onclick="runCommand('pipeline')">🚀 [2] 全自动流水线 (Build Scripts)</button>
-                <button onclick="runCommand('feed')">🌾 [3] 知识饲养员 (KB Feed)</button>
-                <button onclick="runCommand('packager')">📦 [4] 投稿打包封装 (Packager)</button>
-                <button onclick="runCommand('full_flow')">🧩 [5] 一键全流程 (PreHub+Build)</button>
+            <div class="module-grid">
+                {% for section in sections %}
+                <section class="module {{ section.tone }}">
+                    <div class="module-title">
+                        <h3>{{ section.title }}</h3>
+                    </div>
+                    <p>{{ section.description }}</p>
+                    <div class="commands">
+                        {% for command in section.commands %}
+                        <button class="{% if command.danger %}danger{% endif %}" onclick="runCommand('{{ command.id }}')">
+                            <span>{{ command.icon }} {{ command.label }}</span>
+                            <span>运行</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endfor %}
             </div>
+        </section>
 
-            <h2>辅助工具</h2>
-            <div class="btn-group">
-                <button onclick="runCommand('stats')">📊 [6] 查看统计数据 (Show Stats)</button>
-                <button onclick="runCommand('inspire')">🛰️ [7] 灵感探针 (Trend Radar)</button>
-                <button onclick="runCommand('cache')">🧹 [8] 缓存管理 (Cache Tools)</button>
-            </div>
+        <aside class="right-column">
+            <section class="files">
+                <div class="files-header">
+                    <div>
+                        <h2>生成文件清单</h2>
+                        <div id="fileSummary" class="file-meta">加载中...</div>
+                    </div>
+                    <button onclick="loadGeneratedFiles()">刷新清单</button>
+                </div>
+                <div id="filesBody" class="files-body">
+                    {% for group in file_groups.groups %}
+                    <details class="file-group" open>
+                        <summary>{{ group.label }} · {{ group.files|length }}</summary>
+                        <div class="group-desc">{{ group.description }}</div>
+                        {% if group.files %}
+                            {% for file in group.files %}
+                            <div class="file-row">
+                                <div>
+                                    <div class="file-name">{{ file.name }}</div>
+                                    <div class="file-path">{{ file.relative_path }} · {{ file.size_label }} · {{ file.modified_at }}</div>
+                                </div>
+                                <a class="open-link" href="{{ file.open_url }}" target="_blank" rel="noopener">打开</a>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty">暂无文件</div>
+                        {% endif %}
+                    </details>
+                    {% endfor %}
+                </div>
+            </section>
 
-            <h2>诊断与测试项</h2>
-            <div class="btn-group">
-                <button onclick="runCommand('diag_validator')">🧪 [10-2] 运行格式校验自检</button>
-                <button onclick="runCommand('diag_renderer')">🎨 [10-3] 运行渲染引擎自检</button>
-            </div>
-
-            <h2>系统控制</h2>
-            <div class="btn-group">
-                <button onclick="runCommand('exit')" style="background-color: #8a2be2;">🚪 [0] 关闭网页控制台 (Exit)</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="bottom-panel">
-        <h2>执行日志</h2>
-        <div class="output-box" id="output">等待操作...</div>
-    </div>
+            <section class="log-panel">
+                <div class="log-header">
+                    <h2>执行日志</h2>
+                    <span id="lastRun" class="file-meta">等待操作</span>
+                </div>
+                <pre class="output-box" id="output">等待操作...</pre>
+            </section>
+        </aside>
+    </main>
 
     <script>
         async function loadModels() {
@@ -203,11 +354,70 @@
             }
         }
 
+        function renderFiles(payload) {
+            const body = document.getElementById('filesBody');
+            const summary = document.getElementById('fileSummary');
+            summary.textContent = `${payload.total_files || 0} 个文件 · ${payload.generated_at || ''}`;
+            body.innerHTML = '';
+            for (const group of payload.groups || []) {
+                const details = document.createElement('details');
+                details.className = 'file-group';
+                details.open = true;
+                const summaryEl = document.createElement('summary');
+                summaryEl.textContent = `${group.label} · ${(group.files || []).length}`;
+                details.appendChild(summaryEl);
+                const desc = document.createElement('div');
+                desc.className = 'group-desc';
+                desc.textContent = group.description || '';
+                details.appendChild(desc);
+                if (!group.files || !group.files.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty';
+                    empty.textContent = '暂无文件';
+                    details.appendChild(empty);
+                } else {
+                    for (const file of group.files) {
+                        const row = document.createElement('div');
+                        row.className = 'file-row';
+                        const left = document.createElement('div');
+                        const name = document.createElement('div');
+                        name.className = 'file-name';
+                        name.textContent = file.name;
+                        const path = document.createElement('div');
+                        path.className = 'file-path';
+                        path.textContent = `${file.relative_path} · ${file.size_label} · ${file.modified_at}`;
+                        left.appendChild(name);
+                        left.appendChild(path);
+                        const link = document.createElement('a');
+                        link.className = 'open-link';
+                        link.href = file.open_url;
+                        link.target = '_blank';
+                        link.rel = 'noopener';
+                        link.textContent = '打开';
+                        row.appendChild(left);
+                        row.appendChild(link);
+                        details.appendChild(row);
+                    }
+                }
+                body.appendChild(details);
+            }
+        }
+
+        async function loadGeneratedFiles() {
+            try {
+                const response = await fetch('/api/generated-files');
+                renderFiles(await response.json());
+            } catch (error) {
+                document.getElementById('fileSummary').textContent = `文件清单读取失败: ${error}`;
+            }
+        }
+
         async function runCommand(cmd) {
             const outputBox = document.getElementById('output');
             const modelSlot = document.getElementById('modelSelect').value;
+            document.getElementById('lastRun').textContent = `执行中: ${cmd}`;
             outputBox.textContent = `[System] 正在启动任务: ${cmd}\n[ModelSlot] ${modelSlot}\n`;
-            
+
             try {
                 const response = await fetch(`/api/run/${cmd}`, {
                     method: 'POST',
@@ -216,11 +426,17 @@
                 });
                 const result = await response.json();
                 outputBox.textContent += `\n[Result]\n${result.output}`;
+                document.getElementById('lastRun').textContent = `完成: ${cmd}`;
+                await loadGeneratedFiles();
             } catch (error) {
                 outputBox.textContent += `\n[Error] 请求失败: ${error}`;
+                document.getElementById('lastRun').textContent = `失败: ${cmd}`;
             }
         }
+
         loadModels();
+        loadGeneratedFiles();
+        setInterval(loadGeneratedFiles, 5000);
     </script>
 </body>
 </html>

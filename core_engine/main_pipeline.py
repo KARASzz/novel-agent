@@ -206,11 +206,11 @@ def main(no_cache: bool = False, bundle_path: str = None, model_slot: str = None
     
     if summary["processed_success"] > 0 and bool(pipeline_cfg.get("auto_package", False)):
         print("\n" + "-" * 30)
-        print("检测到成功处理的剧本，正在根据配置触发自动打包分发流程...")
+        print("检测到成功处理的章节产物，正在根据配置触发番茄小说存稿打包流程...")
         packager = ProjectPackager(workspace_root)
         project_name = pipeline_cfg.get("project_name", "默认项目成品")
-        genre = pipeline_cfg.get("genre", "短剧")
-        author = pipeline_cfg.get("author", "AI编剧助手")
+        genre = pipeline_cfg.get("genre", "番茄小说")
+        author = pipeline_cfg.get("author", "AI写作助手")
         
         packager.create_submission_package(
             project_name=project_name,

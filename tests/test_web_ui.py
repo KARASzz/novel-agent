@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import web_ui
+from web_file_catalog import GeneratedFileCatalog
 
 
 def test_model_options_exposes_slots(monkeypatch):
@@ -58,3 +59,46 @@ def test_run_command_passes_model_slot_to_pipeline(monkeypatch):
 
     assert payload["output"] == "ok"
     assert captured["cmd"][-2:] == ["--model-slot", "model_slot_4"]
+
+
+def test_generated_file_catalog_lists_and_opens_inline(tmp_path):
+    chapter_dir = tmp_path / "novel_outputs" / "p1" / "chapter_001"
+    chapter_dir.mkdir(parents=True)
+    target = chapter_dir / "chapter.md"
+    target.write_text("# 第一章\n正文", encoding="utf-8")
+
+    catalog = GeneratedFileCatalog(tmp_path)
+    payload = catalog.list_files()
+    group = next(item for item in payload["groups"] if item["key"] == "novel_outputs")
+    file_item = group["files"][0]
+
+    assert file_item["name"] == "chapter.md"
+    assert file_item["open_url"].startswith("/files/open/")
+    html = catalog.preview_html(file_item["id"])
+    assert "# 第一章" in html
+    assert "触发浏览器下载" not in html
+
+
+def test_open_generated_file_response_is_inline(monkeypatch, tmp_path):
+    chapter_dir = tmp_path / "novel_outputs" / "p1" / "chapter_001"
+    chapter_dir.mkdir(parents=True)
+    (chapter_dir / "chapter.md").write_text("正文", encoding="utf-8")
+    catalog = GeneratedFileCatalog(tmp_path)
+    file_id = next(
+        group["files"][0]["id"]
+        for group in catalog.list_files()["groups"]
+        if group["key"] == "novel_outputs"
+    )
+    monkeypatch.setattr(web_ui, "file_catalog", catalog)
+
+    import asyncio
+
+    response = asyncio.run(web_ui.open_generated_file(file_id))
+
+    assert response.status_code == 200
+    assert "content-disposition" not in response.headers
+    assert "正文".encode("utf-8") in response.body
+
+
+def test_jinja_templates_are_auto_reload_enabled():
+    assert getattr(web_ui.templates.env, "auto_reload", False) is True

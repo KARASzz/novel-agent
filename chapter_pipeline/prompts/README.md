@@ -1,8 +1,8 @@
 # 九步章节生产线提示词资产
 
-提示词原文以根目录 `《红星锚定》九步章节生产线完整母版 v2.2.md` 为唯一来源。
+提示词原文已经内置到 `chapter_pipeline/prompt_registry.py`。
 
-`chapter_pipeline.prompt_registry.ChapterPromptRegistry` 会按 XML 标签原样抽取以下 prompt block：
+`chapter_pipeline.prompt_registry.ChapterPromptRegistry` 直接从代码常量读取以下 prompt block：
 
 - `redstar_nine_step_chapter_pipeline_v2_2`
 - `stage_1_chapter_variable_extraction`
@@ -16,4 +16,4 @@
 - `stage_8_evidence_exit_gate`
 - `stage_9_chapter_navigation_script`
 
-不要在这里维护第二份手工拷贝，避免母版和工程提示词发生漂移。
+运行时不要再从根目录母版 Markdown 抽取提示词。后续修改提示词时，直接维护 `prompt_registry.py` 中的代码内置常量。

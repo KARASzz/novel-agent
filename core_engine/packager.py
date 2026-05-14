@@ -1,53 +1,114 @@
 import zipfile
 import glob
 import os
+import json
 from datetime import datetime
 
 class ProjectPackager:
     """
-    剧本打包流水线 (Project Packager)
-    作用：完成整个工作流工业化管线的最后一公里——将生成的一地碎片（几十个 txt 和大纲小传），
-    一键压制成满足平台官方（如红果邮箱或番茄助手 APP）命名要求的标准 ZIP 投稿压缩包。
+    小说打包流水线 (Project Packager)
+    作用：将章节正文、项目设定包、章节回写索引和质检报告整理为番茄小说投稿/存稿结构。
     """
     def __init__(self, workspace_root: str):
         self.workspace_root = workspace_root
         # 设置读取路径
         self.output_dir = os.path.join(self.workspace_root, "scripts_output")
+        self.novel_output_dir = os.path.join(self.workspace_root, "novel_outputs")
         self.templates_dir = os.path.join(self.workspace_root, "templates")
 
     def create_submission_package(self, project_name: str, genre: str, author_name: str) -> str:
-        """组装投递专用的拉链包"""
+        """组装番茄小说投稿/存稿包。保留旧方法名以兼容 CLI 和批处理入口。"""
+        return self.create_fanqie_package(project_name=project_name, genre=genre, author_name=author_name)
+
+    def _chapter_files_from_novel_outputs(self) -> list[str]:
+        pattern = os.path.join(self.novel_output_dir, "*", "chapter_*", "chapter.md")
+        return sorted(glob.glob(pattern))
+
+    def _legacy_chapter_files(self) -> list[str]:
+        return sorted(glob.glob(os.path.join(self.output_dir, "*_成品剧本.txt")))
+
+    @staticmethod
+    def _read_text(path: str) -> str:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def _collect_writebacks(self) -> list[dict]:
+        writebacks = []
+        pattern = os.path.join(self.novel_output_dir, "*", "chapter_*", "next_chapter_writeback.json")
+        for path in sorted(glob.glob(pattern)):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+            except Exception:
+                payload = {"source": path, "error": "read_failed"}
+            writebacks.append(payload)
+        return writebacks
+
+    def _collect_quality_reports(self) -> list[tuple[str, str]]:
+        reports = []
+        pattern = os.path.join(self.novel_output_dir, "*", "chapter_*", "fanqie_quality_report.json")
+        for path in sorted(glob.glob(pattern)):
+            reports.append((path, self._read_text(path)))
+        return reports
+
+    def create_fanqie_package(self, project_name: str, genre: str, author_name: str) -> str:
+        """输出番茄小说投稿/存稿结构 ZIP。"""
         os.makedirs(self.output_dir, exist_ok=True)
 
-        # 红果经典严苛的文件夹与压缩包命名法: [赛道-剧名-笔名/工作室名-日期].zip
         date_str = datetime.now().strftime("%Y%m%d")
-        zip_name = f"【{genre}】{project_name}_{author_name}_红果短剧投稿包_{date_str}.zip"
-        # 将成品投稿包直接存放在 scripts_output 目录中
+        zip_name = f"【{genre}】{project_name}_{author_name}_番茄小说存稿包_{date_str}.zip"
         zip_path = os.path.join(self.output_dir, zip_name)
-        
-        script_added = False
-        
-        print("📦 [打包程序] 启动终极封装与平台投递件准备程序...")
+
+        chapter_files = self._chapter_files_from_novel_outputs()
+        legacy_files = self._legacy_chapter_files()
+        writebacks = self._collect_writebacks()
+        quality_reports = self._collect_quality_reports()
+
+        manifest = {
+            "project_name": project_name,
+            "genre": genre,
+            "author_name": author_name,
+            "package_type": "fanqie_novel_draft",
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "chapter_count": len(chapter_files) or len(legacy_files),
+            "source": "novel_outputs" if chapter_files else "scripts_output_legacy",
+        }
+
+        print("📦 [打包程序] 正在生成番茄小说投稿/存稿包...")
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            
-            # 1. 强力装载红果过审的灵魂：核心大纲 Pitch
+            zipf.writestr("00_打包清单/manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+
             pitch_file = os.path.join(self.templates_dir, "pitch_template.md")
             if os.path.exists(pitch_file):
-                # 入包重命名，以显得正式
-                zipf.write(pitch_file, arcname="01_项目大纲与核心人物小传_必看.md")
+                zipf.write(pitch_file, arcname="01_项目设定包/项目大纲与核心人物小传.md")
             else:
-                print("⚠️ [打包警告]: 未在 templates 文件夹中发现立项大纲问卷 `pitch_template.md`，这极其影响过稿率。")
-                
-            # 2. 装载所有在 scripts_output 文件夹里躺好等待检阅的“完美渲染剧本”
-            scripts_files = glob.glob(os.path.join(self.output_dir, "*_成品剧本.txt"))
-            for index, file in enumerate(sorted(scripts_files)):
-                basename = os.path.basename(file)
-                # 使用一个专门的子文件夹在压缩包内通过存放，显得专业有序
-                zipf.write(file, arcname=f"02_正文剧本存根库/{basename}")
-                script_added = True
-                
-        if not script_added:
-             print("⚠️ [打包警告]: `scripts_output/` 里空空如也，你打包了一个没放剧本的空气投递包..")
-             
-        print(f"✅ 成功生成【工业级投递压缩包】：\n-> 📦 {zip_path}")
+                zipf.writestr(
+                    "01_项目设定包/README.md",
+                    "# 项目设定包\n\n未发现 templates/pitch_template.md，请在正式投稿前补齐项目设定、人物小传和世界观规则。\n",
+                )
+
+            if chapter_files:
+                for file in chapter_files:
+                    chapter_dir = os.path.basename(os.path.dirname(file))
+                    zipf.write(file, arcname=f"02_正文分章/{chapter_dir}.md")
+            else:
+                for index, file in enumerate(legacy_files, start=1):
+                    basename = os.path.splitext(os.path.basename(file))[0]
+                    zipf.write(file, arcname=f"02_正文分章/chapter_{index:03d}_{basename}.txt")
+
+            zipf.writestr(
+                "03_章节回写索引/next_chapter_writebacks.json",
+                json.dumps(writebacks, ensure_ascii=False, indent=2),
+            )
+            if quality_reports:
+                for path, content in quality_reports:
+                    chapter_dir = os.path.basename(os.path.dirname(path))
+                    zipf.writestr(f"04_质检报告/{chapter_dir}_fanqie_quality_report.json", content)
+            else:
+                zipf.writestr("04_质检报告/README.md", "未发现 fanqie_quality_report.json。\n")
+
+        if not chapter_files and not legacy_files:
+             print("⚠️ [打包警告]: 未发现章节正文，已生成只含清单与占位说明的番茄小说存稿包。")
+
+        print(f"✅ 成功生成【番茄小说投稿/存稿包】：\n-> 📦 {zip_path}")
         return zip_path
