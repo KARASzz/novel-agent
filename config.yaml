@@ -3,15 +3,7 @@ project:
   platform: "fanqie_novel"
   product_name: "番茄小说一键制造机"
 
-pipeline:
-  max_workers: 3
-  report_json: true
-  file_timeout_sec: 300  # 单文件处理超时上限（秒）
-  rate_limit:
-    # 全局请求节流（每秒请求数）。0 为关闭。
-    requests_per_second: 0
-
-parser:
+llm:
   model_slot: "model_slot_1"
   api_key_env: "MINIMAX_API_KEY"
   base_url: "https://api.minimaxi.com/v1"
@@ -30,18 +22,6 @@ parser:
     base_delay_sec: 1.0
     max_delay_sec: 8.0
     jitter_sec: 0.25
-
-validator:
-  min_duration_sec: 60
-  max_duration_sec: 150
-  speech_rate: 4.5
-
-scoring:
-  duration_short_penalty: 10
-  duration_long_penalty: 30
-  no_hook_penalty: 15
-  paywall_no_hook_penalty: 40
-  first3_no_hook_penalty: 20
 
 logging:
   log_level: "INFO"
@@ -90,7 +70,7 @@ pre_hub:
     passport_ttl_days: 14  # 准入护照有效期
 
 cache:
-  parser_result_ttl_days: 180
+  chapter_snapshot_ttl_days: 180
 
 models:
   default_slot: "model_slot_1"

@@ -33,7 +33,7 @@ def main():
         sys.exit(1)
         
     cfg = load_config()
-    parser_cfg = cfg.get("parser", {})
+    llm_cfg = cfg.get("llm", {})
     model_cfg = resolve_model_config(cfg)
     api_key_env = str(model_cfg.get("api_key_env") or "selected model API key")
     api_key = os.getenv(api_key_env)
@@ -71,7 +71,7 @@ def main():
             instructions=instructions,
             input_text=user_input,
             temperature=0.4,
-            enable_thinking=bool(parser_cfg.get("tools", {}).get("enable_thinking", True)),
+            enable_thinking=bool(llm_cfg.get("tools", {}).get("enable_thinking", True)),
         )
         report_content = getattr(response, "output_text", None)
         if not report_content:

@@ -38,16 +38,15 @@ def resolve_model_config(
     """Resolve a model slot into the values needed by LLMClient.
 
     The project now treats model choices as runtime slots so the web console can
-    switch providers without changing pipeline code. Legacy parser-level fields
-    are still accepted as a compatibility fallback.
+    switch providers without changing pipeline code.
     """
     cfg = config or load_config()
-    parser_cfg = cfg.get("parser", {})
+    llm_cfg = cfg.get("llm", {})
     registry = get_model_registry(cfg)
     slots = registry.get("slots", {}) if isinstance(registry.get("slots", {}), dict) else {}
     selected = (
         slot_name
-        or parser_cfg.get("model_slot")
+        or llm_cfg.get("model_slot")
         or registry.get("default_slot")
         or DEFAULT_MODEL_SLOT
     )
@@ -57,9 +56,9 @@ def resolve_model_config(
         return {
             "slot_name": selected,
             "display_name": slot.get("display_name", selected),
-            "base_url": slot.get("base_url") or parser_cfg.get("base_url", ""),
-            "api_key_env": slot.get("api_key_env") or parser_cfg.get("api_key_env", ""),
-            "model_id": slot.get("model_id") or parser_cfg.get("model", ""),
+            "base_url": slot.get("base_url") or llm_cfg.get("base_url", ""),
+            "api_key_env": slot.get("api_key_env") or llm_cfg.get("api_key_env", ""),
+            "model_id": slot.get("model_id") or llm_cfg.get("model", ""),
             "enabled": bool(slot.get("enabled", True)),
             "note": slot.get("note", ""),
         }
@@ -67,11 +66,11 @@ def resolve_model_config(
     return {
         "slot_name": selected,
         "display_name": selected,
-        "base_url": parser_cfg.get("base_url", ""),
-        "api_key_env": parser_cfg.get("api_key_env", ""),
-        "model_id": parser_cfg.get("model", ""),
+        "base_url": llm_cfg.get("base_url", ""),
+        "api_key_env": llm_cfg.get("api_key_env", ""),
+        "model_id": llm_cfg.get("model", ""),
         "enabled": True,
-        "note": "legacy_parser_config",
+        "note": "llm_config",
     }
 
 
@@ -118,14 +117,6 @@ def _defaults() -> Dict[str, Any]:
             "platform": "fanqie_novel",
             "product_name": "番茄小说一键制造机",
         },
-        "pipeline": {
-            "max_workers": 3,
-            "report_json": True,
-            "file_timeout_sec": 300,
-            "rate_limit": {
-                "requests_per_second": 0,  # 0 means disabled
-            },
-        },
         "models": {
             "default_slot": DEFAULT_MODEL_SLOT,
             "slots": {
@@ -171,7 +162,7 @@ def _defaults() -> Dict[str, Any]:
                 },
             },
         },
-        "parser": {
+        "llm": {
             "model_slot": DEFAULT_MODEL_SLOT,
             "api_key_env": "MODEL_SLOT_1_API_KEY",
             "base_url": "",
@@ -193,18 +184,6 @@ def _defaults() -> Dict[str, Any]:
                 "jitter_sec": 0.25,
             },
         },
-        "validator": {
-            "min_duration_sec": 60,
-            "max_duration_sec": 150,
-            "speech_rate": 4.5,
-        },
-        "scoring": {
-            "duration_short_penalty": 10,
-            "duration_long_penalty": 30,
-            "no_hook_penalty": 15,
-            "paywall_no_hook_penalty": 40,
-            "first3_no_hook_penalty": 20,
-        },
         "logging": {
             "log_level": "INFO",
         },
@@ -218,6 +197,6 @@ def _defaults() -> Dict[str, Any]:
             "top_k": 2,
         },
         "cache": {
-            "parser_result_ttl_days": 180,
+            "chapter_snapshot_ttl_days": 180,
         },
     }

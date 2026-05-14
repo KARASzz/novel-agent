@@ -2,7 +2,7 @@
 
 > 用途：定义“立项 -> 大纲 -> 设定集 -> 分卷故事清单 -> 章级施工卡 -> 九步章节生产线”的中台流程。  
 > 边界：本模板不写正文，不替代《红星锚定》九步章节生产线完整母版 v2.2。  
-> 上游模板：`webnovel_outline_template_v1.md`、`webnovel_setting_bible_template_v1.md`。
+> 上游模板：`templates/webnovel_outline_template_v1.md`、`templates/webnovel_setting_bible_template_v1.md`。
 
 ---
 
@@ -12,8 +12,8 @@
 file_role: webnovel_orchestration_template
 priority: process_and_agent_boundary
 source_templates:
-  - webnovel_outline_template_v1.md
-  - webnovel_setting_bible_template_v1.md
+  - templates/webnovel_outline_template_v1.md
+  - templates/webnovel_setting_bible_template_v1.md
 must_preserve:
   - 现有九步章节生产线第2-9步
   - 第6A两节拍正文
@@ -30,8 +30,8 @@ cannot_do:
 
 ```text
 立项通过
-  -> 按 webnovel_outline_template_v1.md 生成全书宏观大纲
-  -> 按 webnovel_setting_bible_template_v1.md 生成设定集
+  -> 按 templates/webnovel_outline_template_v1.md 生成全书宏观大纲
+  -> 按 templates/webnovel_setting_bible_template_v1.md 生成设定集
   -> 4个卷Agent分别生成每卷极简故事清单
   -> 章级施工卡Agent按需生成当前章施工卡
   -> 九步章节生产线第1步读取施工卡并生成输入卡
@@ -64,7 +64,7 @@ forbidden:
 
 ```yaml
 role: "全书大纲Agent"
-template: "webnovel_outline_template_v1.md"
+template: "templates/webnovel_outline_template_v1.md"
 output: "NovelMacroOutline"
 must_include:
   - 商业定位
@@ -82,7 +82,7 @@ forbidden:
 
 ```yaml
 role: "设定集Agent"
-template: "webnovel_setting_bible_template_v1.md"
+template: "templates/webnovel_setting_bible_template_v1.md"
 output: "NovelSettingBible"
 must_include:
   - 世界宪法

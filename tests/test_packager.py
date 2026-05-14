@@ -20,7 +20,8 @@ def test_fanqie_packager_exports_novel_outputs(tmp_path):
 
     templates = tmp_path / "templates"
     templates.mkdir()
-    (templates / "pitch_template.md").write_text("# 项目设定", encoding="utf-8")
+    (templates / "webnovel_outline_template_v1.md").write_text("# 大纲", encoding="utf-8")
+    (templates / "webnovel_setting_bible_template_v1.md").write_text("# 设定集", encoding="utf-8")
 
     zip_path = ProjectPackager(str(tmp_path)).create_fanqie_package(
         project_name="旧站台",
@@ -29,11 +30,12 @@ def test_fanqie_packager_exports_novel_outputs(tmp_path):
     )
 
     assert os.path.basename(zip_path).endswith("_番茄小说存稿包_" + os.path.basename(zip_path).split("_")[-1])
-    assert "红果短剧投稿包" not in os.path.basename(zip_path)
+    assert "番茄小说存稿包" in os.path.basename(zip_path)
     with zipfile.ZipFile(zip_path) as zipf:
         names = set(zipf.namelist())
         assert "00_打包清单/manifest.json" in names
-        assert "01_项目设定包/项目大纲与核心人物小传.md" in names
+        assert "01_项目设定包/webnovel_outline_template_v1.md" in names
+        assert "01_项目设定包/webnovel_setting_bible_template_v1.md" in names
         assert "02_正文分章/chapter_001.md" in names
         assert "03_章节回写索引/next_chapter_writebacks.json" in names
         assert "04_质检报告/chapter_001_fanqie_quality_report.json" in names
@@ -41,4 +43,3 @@ def test_fanqie_packager_exports_novel_outputs(tmp_path):
         manifest = json.loads(zipf.read("00_打包清单/manifest.json").decode("utf-8"))
         assert manifest["package_type"] == "fanqie_novel_draft"
         assert manifest["chapter_count"] == 1
-

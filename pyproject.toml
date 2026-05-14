@@ -1,7 +1,7 @@
 [project]
-name = "hongguo-script-maker"
+name = "novel-agent"
 version = "0.1.0"
-description = "红果剧本一键制造机 - 工业级短剧脚本生产线"
+description = "番茄小说一键制造机 - 网文立项、大纲中台、章节生产与导出流水线"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -25,7 +25,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-# 显式指定需要打包的目录，避免把 logs, drafts 等数据文件夹也当成 Python 包
+# 显式指定需要打包的目录，避免把 logs、novel_outputs 等数据文件夹也当成 Python 包
 packages = [
     "core_engine",
     "chapter_pipeline",

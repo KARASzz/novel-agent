@@ -67,7 +67,7 @@ def test_llm_client_converts_legacy_text_json_schema(mock_openai):
         text={
             "format": {
                 "type": "json_schema",
-                "name": "episode_schema",
+                "name": "chapter_schema",
                 "strict": True,
                 "schema": {"type": "object"},
             }
@@ -78,7 +78,7 @@ def test_llm_client_converts_legacy_text_json_schema(mock_openai):
     assert call_kwargs["response_format"] == {
         "type": "json_schema",
         "json_schema": {
-            "name": "episode_schema",
+            "name": "chapter_schema",
             "strict": True,
             "schema": {"type": "object"},
         },
@@ -100,7 +100,7 @@ def test_resolve_model_config_reads_five_slots():
                 for idx in range(1, 6)
             },
         },
-        "parser": {},
+        "llm": {},
     }
 
     resolved = resolve_model_config(config)

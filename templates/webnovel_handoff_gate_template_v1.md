@@ -30,9 +30,9 @@ cannot_do:
 ```yaml
 artifact_chain_gate:
   outline_exists: true/false
-  outline_uses_template: "webnovel_outline_template_v1.md"
+  outline_uses_template: "templates/webnovel_outline_template_v1.md"
   setting_bible_exists: true/false
-  setting_bible_uses_template: "webnovel_setting_bible_template_v1.md"
+  setting_bible_uses_template: "templates/webnovel_setting_bible_template_v1.md"
   volume_story_list_exists: true/false
   chapter_construction_card_exists: true/false
   previous_stage_9_writeback_exists_or_first_chapter_exception: true/false

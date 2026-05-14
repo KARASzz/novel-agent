@@ -36,21 +36,20 @@ echo.
 echo ╔══════════【 核心工作流 】════════════╗
 echo ║                                      ║
 echo ║  [1] 🧭 新书立项评审 (Preflight)     ║
-echo ║  [2] 🚀 章节流水线   (Chapter Build) ║
+echo ║  [2] ✍️  生成下一章   (Next Chapter) ║
 echo ║  [3] 🌾 本地知识库   (KB Feed)       ║
 echo ║  [4] 📦 番茄存稿导出 (Export)        ║
-echo ║  [5] 🧩 一键立项预跑 (Preflight+Run) ║
+echo ║  [5] 🧩 立项产物预跑 (Preflight)     ║
 echo ║                                      ║
 echo ╠════════════【 辅助工具 】════════════╣
 echo ║                                      ║
-echo ║  [6] 📊 查看统计数据 (Show Stats)    ║
-echo ║  [7] 🛰️ 灵感探针     (Trend Radar)   ║
-echo ║  [8] 🧹 缓存管理     (Cache Tools)   ║
-echo ║  [9] 🌐 网页控制台   (Jinja2 Hot)   ║
+echo ║  [6] 🛰️ 灵感探针     (Trend Radar)   ║
+echo ║  [7] 🧹 缓存管理     (Cache Tools)   ║
+echo ║  [8] 🌐 网页控制台   (Jinja2 Hot)   ║
 echo ║                                      ║
 echo ╠══════════【 诊断与测试项 】══════════╣
 echo ║                                      ║
-echo ║  [10] 🧪 诊断工具箱   (Diagnostics)  ║
+echo ║  [9] 🧪 诊断工具箱   (Diagnostics)  ║
 echo ║                                      ║
 echo ╠════════════【 系统控制 】════════════╣
 echo ║                                      ║
@@ -61,17 +60,16 @@ echo.
 set /p opt="请输入编号并回车: "
 
 if "%opt%"=="1" goto run_preflight
-if "%opt%"=="2" goto run_pipeline
+if "%opt%"=="2" goto run_next_chapter
 if "%opt%"=="3" goto run_feed
 if "%opt%"=="4" goto run_packager
 if "%opt%"=="5" goto run_full_flow
-if "%opt%"=="6" goto show_stats
-if "%opt%"=="7" goto run_inspire
-if "%opt%"=="8" goto cache_menu
-if "%opt%"=="9" goto run_web_ui
-if "%opt%"=="10" goto diagnostics_menu
+if "%opt%"=="6" goto run_inspire
+if "%opt%"=="7" goto cache_menu
+if "%opt%"=="8" goto run_web_ui
+if "%opt%"=="9" goto diagnostics_menu
 if "%opt%"=="0" exit /b
-echo ⚠️ 输入错误，请重新选择 (0-10)
+echo ⚠️ 输入错误，请重新选择 (0-9)
 timeout /t 2 >nul
 goto header
 
@@ -147,21 +145,23 @@ if "%BUNDLE_PATH%"=="" (
 )
 
 echo.
-echo 🚀 [2/2] 正在携带 ContextBundle 启动章节生产流水线...
-python -m scripts.cli run --bundle "%BUNDLE_PATH%"
-set "LAST_ERROR=%ERRORLEVEL%"
+echo ✅ 已生成立项产物。下一步请按 templates/webnovel_outline_template_v1.md 生成全书大纲，再生成设定集与章级施工卡。
+set "LAST_ERROR=0"
 goto end_action
 
-:run_pipeline
+:run_next_chapter
 echo.
-set /p PIPELINE_OPT="如需忽略缓存强制重跑，请输入 N；直接回车正常启动: "
-if /I "%PIPELINE_OPT%"=="N" (
-	echo ☢️ 正在启动章节流水线（忽略缓存）...
-	python -m scripts.cli run --no-cache
-) else (
-	echo ☢️ 正在启动章节流水线...
-	python -m scripts.cli run
-)
+set "CHAPTER_TITLE="
+set /p CHAPTER_TITLE="请输入章节标题（直接回车默认 第一章：控制台试运行）: "
+if "%CHAPTER_TITLE%"=="" set "CHAPTER_TITLE=第一章：控制台试运行"
+set "CHAPTER_INDEX="
+set /p CHAPTER_INDEX="请输入章节序号（直接回车默认 1）: "
+if "%CHAPTER_INDEX%"=="" set "CHAPTER_INDEX=1"
+set "PROJECT_ID="
+set /p PROJECT_ID="请输入项目ID/书名slug（直接回车默认 console_demo）: "
+if "%PROJECT_ID%"=="" set "PROJECT_ID=console_demo"
+echo ✍️ 正在生成下一章 mock 产物...
+python -m scripts.cli next-chapter "%CHAPTER_TITLE%" --chapter-index %CHAPTER_INDEX% --project-id "%PROJECT_ID%"
 set "LAST_ERROR=%ERRORLEVEL%"
 goto end_action
 
@@ -185,17 +185,11 @@ python -m scripts.cli export-fanqie --name "%PROJECT_NAME%" --genre "%GENRE%" --
 set "LAST_ERROR=%ERRORLEVEL%"
 goto end_action
 
-:show_stats
-echo.
-python -m scripts.cli stats
-set "LAST_ERROR=%ERRORLEVEL%"
-goto end_action
-
 :cache_menu
 cls
 echo ╔══════════【 缓存管理 】══════════╗
 echo ║                                  ║
-echo ║  [1] 全量清理解析缓存            ║
+echo ║  [1] 全量清理章节生产缓存        ║
 echo ║  [2] 按关键词筛选清理            ║
 echo ║  [0] 返回主菜单                  ║
 echo ║                                  ║
@@ -271,7 +265,6 @@ cls
 echo ╔══════════【 诊断工具箱 】══════════╗
 echo ║                                    ║
 echo ║  [1] 🧪 运行番茄章节质检自检       ║
-echo ║  [2] 🎨 运行渲染引擎自检           ║
 echo ║  [0] 返回主菜单                    ║
 echo ║                                    ║
 echo ╚════════════════════════════════════╝
@@ -279,9 +272,8 @@ echo.
 set /p diag_opt="请输入编号并回车: "
 
 if "%diag_opt%"=="1" goto run_validator
-if "%diag_opt%"=="2" goto run_renderer
 if "%diag_opt%"=="0" goto header
-echo ⚠️ 输入错误，请重新选择 (0-2)
+echo ⚠️ 输入错误，请重新选择 (0-1)
 timeout /t 2 >nul
 goto diagnostics_menu
 
@@ -289,13 +281,6 @@ goto diagnostics_menu
 echo.
 echo 🧪 正在执行番茄小说章节质检自检...
 python -m scripts.cli self-test validator
-set "LAST_ERROR=%ERRORLEVEL%"
-goto end_action
-
-:run_renderer
-echo.
-echo 🎨 正在执行渲染输出引擎自检...
-python -m scripts.cli self-test renderer
 set "LAST_ERROR=%ERRORLEVEL%"
 goto end_action
 

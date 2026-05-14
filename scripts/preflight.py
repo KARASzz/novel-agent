@@ -7,7 +7,7 @@ import sys
 from typing import Optional
 
 from pre_hub.pre_hub import PreHubOrchestrator
-from pre_hub.schemas.pre_hub_models import ContextBundleForParser, FormatLane
+from pre_hub.schemas.pre_hub_models import ChapterProductionBundle, FormatLane
 
 
 def _workspace_root() -> str:
@@ -22,7 +22,7 @@ def _resolve_output_path(path_or_dir: str, default_name: str) -> str:
     return os.path.join(path_or_dir, default_name)
 
 
-def _default_report_paths(bundle: ContextBundleForParser) -> tuple[str, str]:
+def _default_report_paths(bundle: ChapterProductionBundle) -> tuple[str, str]:
     report_dir = os.path.join(_workspace_root(), "reports", "preflight")
     os.makedirs(report_dir, exist_ok=True)
     stamp = bundle.created_at.strftime("%Y%m%d_%H%M%S")
@@ -30,13 +30,13 @@ def _default_report_paths(bundle: ContextBundleForParser) -> tuple[str, str]:
     return os.path.join(report_dir, f"{base}.json"), os.path.join(report_dir, f"{base}.md")
 
 
-def _write_json(bundle: ContextBundleForParser, path: str) -> None:
+def _write_json(bundle: ChapterProductionBundle, path: str) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(bundle.model_dump(mode="json"), f, ensure_ascii=False, indent=2)
 
 
-def _build_markdown(bundle: ContextBundleForParser) -> str:
+def _build_markdown(bundle: ChapterProductionBundle) -> str:
     capsule = bundle.project_capsule
     passport = bundle.preflight_passport
     route = bundle.route_decision
@@ -95,7 +95,7 @@ def _build_markdown(bundle: ContextBundleForParser) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
-def _write_markdown(bundle: ContextBundleForParser, path: str) -> None:
+def _write_markdown(bundle: ChapterProductionBundle, path: str) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(_build_markdown(bundle))
@@ -115,7 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--author", type=str, default="default", help="作者ID")
     parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
     parser.add_argument("--output", "-o", type=str, help="额外保存 Markdown 报告到指定路径")
-    parser.add_argument("--save-bundle", type=str, help="保存 ContextBundle JSON 到指定目录或文件")
+    parser.add_argument("--save-bundle", type=str, help="保存 ChapterProductionBundle JSON 到指定目录或文件")
     return parser
 
 

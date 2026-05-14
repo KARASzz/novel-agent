@@ -401,7 +401,7 @@ class LTMWriteAudit(VersionedModel):
     error: Optional[str] = None
 
 
-class ContextBundleForParser(VersionedModel):
+class ChapterProductionBundle(VersionedModel):
     bundle_id: str
     project_id: str
     project_capsule: ProjectCapsule
@@ -438,7 +438,7 @@ class ContextBundleForParser(VersionedModel):
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
-    def seal(self) -> "ContextBundleForParser":
+    def seal(self) -> "ChapterProductionBundle":
         self.integrity_hash = self.compute_integrity_hash()
         self.prompt_injection_payload = {"system_addition": self.to_injection_prompt()}
         return self
@@ -495,8 +495,7 @@ class ContextBundleForParser(VersionedModel):
         return "\n".join(lines)
 
 
-NovelProjectBundle = ContextBundleForParser
-ChapterProductionBundle = ContextBundleForParser
+NovelProjectBundle = ChapterProductionBundle
 
 
 # Backward-compatible layer shells used by existing helper modules.
@@ -558,4 +557,4 @@ class Layer6Output(StrictModel):
 
 class Layer7Output(StrictModel):
     preflight_passport: PreflightPassport
-    context_bundle: ContextBundleForParser
+    context_bundle: ChapterProductionBundle

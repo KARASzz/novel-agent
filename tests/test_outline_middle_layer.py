@@ -13,9 +13,9 @@ def test_outline_middle_layer_templates_exist_and_reference_sources():
     for filename in SOURCE_UPSTREAM_TEMPLATES + REQUIRED_MIDDLE_LAYER_TEMPLATES:
         assert (root / filename).exists(), filename
 
-    orchestration = (root / "webnovel_orchestration_template_v1.md").read_text(encoding="utf-8")
-    assert "webnovel_outline_template_v1.md" in orchestration
-    assert "webnovel_setting_bible_template_v1.md" in orchestration
+    orchestration = (root / "templates/webnovel_orchestration_template_v1.md").read_text(encoding="utf-8")
+    assert "templates/webnovel_outline_template_v1.md" in orchestration
+    assert "templates/webnovel_setting_bible_template_v1.md" in orchestration
     assert "4个卷Agent" in orchestration
 
 

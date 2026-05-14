@@ -12,8 +12,8 @@ from pre_hub.schemas.pre_hub_models import (
     AudiencePriorMatrix,
     AuthorMemoryPack,
     BranchScore,
+    ChapterProductionBundle,
     ContentLane,
-    ContextBundleForParser,
     EmotionCore,
     FormatFitItem,
     FormatLane,
@@ -89,7 +89,7 @@ class PreHubOrchestrator:
         format_lane: FormatLane = FormatLane.REAL,
         author_id: str = "default",
         use_rag: bool = True,
-    ) -> ContextBundleForParser:
+    ) -> ChapterProductionBundle:
         print(f"[Novel Preflight] M00 start: topic={topic}, chapter_form={format_lane.label}")
         capsule = self._m00_intake(topic, format_lane, author_id)
 
@@ -112,7 +112,7 @@ class PreHubOrchestrator:
         risk = self._m08_adversarial_gate(capsule, market, route, narrative, risk_signals)
         passport = self._m09_admission(capsule, market, author_memory, route, narrative, risk)
 
-        bundle = ContextBundleForParser(
+        bundle = ChapterProductionBundle(
             bundle_id=f"bundle_{capsule.project_id}",
             project_id=capsule.project_id,
             project_capsule=capsule,
@@ -769,7 +769,7 @@ class PreHubOrchestrator:
             expiry_at=utc_now() + timedelta(days=14),
         )
 
-    def _mx1_stage_memory_candidate(self, bundle: ContextBundleForParser) -> None:
+    def _mx1_stage_memory_candidate(self, bundle: ChapterProductionBundle) -> None:
         risk = bundle.risk_pack
         route = bundle.route_decision
         passport = bundle.preflight_passport

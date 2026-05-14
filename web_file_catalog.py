@@ -30,19 +30,13 @@ class GeneratedFileCatalog:
                 key="novel_outputs",
                 label="小说章节产物",
                 path=self.workspace_root / "novel_outputs",
-                description="九步章节生产线生成的正文、质检报告、回写和执行计划。",
-            ),
-            "scripts_output": CatalogRoot(
-                key="scripts_output",
-                label="存稿与打包产物",
-                path=self.workspace_root / "scripts_output",
-                description="番茄小说存稿包、历史流水线文本产物和导出压缩包。",
+                description="九步章节生产线生成的正文、质检报告、回写、执行计划和存稿包。",
             ),
             "reports": CatalogRoot(
                 key="reports",
                 label="运行报告",
                 path=self.workspace_root / "reports",
-                description="前置立项、批处理、诊断和审计报告。",
+                description="前置立项、章节批量运行、诊断和审计报告。",
             ),
         }
 

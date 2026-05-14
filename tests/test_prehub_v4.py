@@ -157,7 +157,7 @@ def test_shadow_store_reads_candidates(tmp_path):
     assert loaded[0].candidate_id == "c1"
 
 
-def test_context_bundle_serializes_for_parser(tmp_path):
+def test_chapter_production_bundle_serializes_for_pipeline(tmp_path):
     kb_dir = tmp_path / "knowledge_base"
     kb_dir.mkdir()
     (kb_dir / "method.md").write_text("番茄小说 逆袭 情绪债 反转 追读钩子", encoding="utf-8")

@@ -2,7 +2,7 @@
 
 > 用途：给每个卷Agent输出本卷100章的极简故事清单。  
 > 边界：每章只写两句话概括，不写施工卡，不写正文。  
-> 上游：`webnovel_outline_template_v1.md`、`webnovel_setting_bible_template_v1.md`。
+> 上游：`templates/webnovel_outline_template_v1.md`、`templates/webnovel_setting_bible_template_v1.md`。
 
 ---
 
@@ -36,8 +36,8 @@ volume_agent:
   volume_id: 1
   volume_title: ""
   chapter_range: "1-100 / 101-200 / 201-300 / 301-400"
-  source_outline: "webnovel_outline_template_v1.md产物"
-  source_setting_bible: "webnovel_setting_bible_template_v1.md产物"
+  source_outline: "templates/webnovel_outline_template_v1.md产物"
+  source_setting_bible: "templates/webnovel_setting_bible_template_v1.md产物"
   output_contract: "VolumeStoryList"
 ```
 

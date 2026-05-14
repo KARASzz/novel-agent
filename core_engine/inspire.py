@@ -42,7 +42,7 @@ def main():
     print(f"✅ 成功命中 {len(results)} 条前沿趋势，正在准备交给大模型核心进行概念提纯...")
     
     cfg = load_config()
-    parser_cfg = cfg.get("parser", {})
+    llm_cfg = cfg.get("llm", {})
     model_cfg = resolve_model_config(cfg)
     api_key_env = str(model_cfg.get("api_key_env") or "selected model API key")
     api_key = os.getenv(api_key_env)
@@ -67,10 +67,10 @@ def main():
         materials_text += f"[{idx}] 标题：{r.get('title')}\n内容摘要：{r.get('content')}\n链接：{r.get('url')}\n\n"
 
     # 工具构造标准化
-    tools_cfg = parser_cfg.get("tools", {})
+    tools_cfg = llm_cfg.get("tools", {})
     enable_thinking = bool(tools_cfg.get("enable_thinking", True))
     
-    rag_cfg = parser_cfg.get("rag", {})
+    rag_cfg = llm_cfg.get("rag", {})
     index_id_env = rag_cfg.get("index_id_env", "BAILIAN_INDEX_ID")
     index_id = os.environ.get(index_id_env)
 

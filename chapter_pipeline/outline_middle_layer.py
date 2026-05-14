@@ -6,16 +6,16 @@ from typing import Dict, List, Optional
 
 
 SOURCE_UPSTREAM_TEMPLATES = (
-    "webnovel_outline_template_v1.md",
-    "webnovel_setting_bible_template_v1.md",
+    "templates/webnovel_outline_template_v1.md",
+    "templates/webnovel_setting_bible_template_v1.md",
 )
 
 
 REQUIRED_MIDDLE_LAYER_TEMPLATES = (
-    "webnovel_orchestration_template_v1.md",
-    "webnovel_volume_story_list_template_v1.md",
-    "webnovel_chapter_construction_card_template_v1.md",
-    "webnovel_handoff_gate_template_v1.md",
+    "templates/webnovel_orchestration_template_v1.md",
+    "templates/webnovel_volume_story_list_template_v1.md",
+    "templates/webnovel_chapter_construction_card_template_v1.md",
+    "templates/webnovel_handoff_gate_template_v1.md",
 )
 
 

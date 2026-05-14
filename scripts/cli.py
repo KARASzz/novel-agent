@@ -11,25 +11,8 @@ def _get_workspace() -> str:
 def _get_cache_manager(workspace: str):
     from core_engine.cache_manager import CacheManager
 
-    cache_dir = os.path.join(workspace, ".cache", "parser_results")
+    cache_dir = os.path.join(workspace, ".cache", "chapter_snapshots")
     return CacheManager(cache_dir)
-
-
-def _run_pipeline_command(
-    no_cache: bool,
-    bundle_path: Optional[str] = None,
-    model_slot: Optional[str] = None,
-) -> None:
-    from core_engine.main_pipeline import main as run_pipeline
-
-    run_pipeline(no_cache=no_cache, bundle_path=bundle_path, model_slot=model_slot)
-
-
-def _show_stats_command() -> None:
-    from core_engine.config_loader import load_config
-    from core_engine.main_pipeline import show_stats
-
-    show_stats(load_config())
 
 
 def _clear_cache_command(filter_keyword: Optional[str]) -> int:
@@ -145,16 +128,13 @@ def _verify_rag_command() -> int:
     return verify()
 
 
-def _self_test_command(target: str, output_dir: Optional[str] = None) -> None:
-    if target == "validator":
-        from core_engine.validator import run_self_test
+def _self_test_command(target: str) -> None:
+    if target != "validator":
+        raise ValueError(f"未知自检目标: {target}")
 
-        run_self_test()
-        return
+    from core_engine.validator import run_self_test
 
-    from core_engine.renderer import run_self_test
-
-    run_self_test(output_dir=output_dir)
+    run_self_test()
 
 
 def _ltm_review_command(project_id: Optional[str], apply_approved: bool) -> int:
@@ -196,11 +176,6 @@ def build_parser() -> argparse.ArgumentParser:
     new_book_parser.add_argument("--output", "-o", help="额外保存 Markdown 报告到指定路径")
     new_book_parser.add_argument("--save-bundle", help="保存 ContextBundle JSON 到指定目录或文件")
 
-    run_parser = subparsers.add_parser("run", help="启动番茄小说章节流水线处理 drafts/ 文件夹")
-    run_parser.add_argument("--no-cache", action="store_true", help="忽略现有解析快照，强制重新调用 LLM")
-    run_parser.add_argument("--bundle", help="前置立项 ContextBundle JSON 路径，用于注入新书上下文")
-    run_parser.add_argument("--model-slot", help="选择 OpenAI Chat Completions 模型槽位，例如 model_slot_1")
-
     next_parser = subparsers.add_parser("next-chapter", help="生成下一章 mock 产物并写入 novel_outputs")
     next_parser.add_argument("title", help="当前章标题，例如 第一章：旧城来信")
     next_parser.add_argument("--chapter-index", type=int, default=1, help="章节序号")
@@ -223,13 +198,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("model-diagnose", help="模型诊断：查看 5 个 OpenAI Chat Completions 槽位")
 
-    clear_parser = subparsers.add_parser("clear-cache", help="清理渲染缓存数据")
+    clear_parser = subparsers.add_parser("clear-cache", help="清理章节生产缓存数据")
     clear_parser.add_argument("--filter", type=str, help="根据关键词筛选清理特定题材或章节快照")
     clear_parser.add_argument("--yes", action="store_true", help="跳过交互式确认，直接执行清理")
 
-    subparsers.add_parser("stats", help="查看当前项目统计数据与转换率")
-
-    package_parser = subparsers.add_parser("package", help="将 scripts_output 中的章节产物封装为投稿/存稿包")
+    package_parser = subparsers.add_parser("package", help="将 novel_outputs 中的章节产物封装为投稿/存稿包")
     package_parser.add_argument("--name", required=True, help="项目名/书名")
     package_parser.add_argument("--genre", required=True, help="题材或投稿赛道")
     package_parser.add_argument("--author", required=True, help="笔名或工作室名")
@@ -242,8 +215,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("verify-rag", help=argparse.SUPPRESS)
 
     self_test_parser = subparsers.add_parser("self-test", help="运行内置诊断自检")
-    self_test_parser.add_argument("target", choices=["validator", "renderer"], help="选择要运行的自检目标")
-    self_test_parser.add_argument("--output-dir", help="renderer 自检输出目录")
+    self_test_parser.add_argument("target", choices=["validator"], help="选择要运行的自检目标")
 
     ltm_parser = subparsers.add_parser("ltm-review", help=argparse.SUPPRESS)
     ltm_parser.add_argument("--project-id", help="只处理指定项目ID")
@@ -265,14 +237,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             output=args.output,
             save_bundle=args.save_bundle,
         )
-
-    if args.command == "run":
-        _run_pipeline_command(
-            no_cache=args.no_cache,
-            bundle_path=args.bundle,
-            model_slot=args.model_slot,
-        )
-        return 0
 
     if args.command == "next-chapter":
         return _next_chapter_command(
@@ -300,13 +264,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.command == "model-diagnose":
         return _model_diagnose_command()
 
-    if args.command == "stats":
-        _show_stats_command()
-        return 0
-
     if args.command == "clear-cache":
         if not args.yes:
-            message = "确定要清理所有解析快照吗？"
+            message = "确定要清理所有章节生产缓存快照吗？"
             if args.filter:
                 message = f"确定要清理包含关键词 '{args.filter}' 的缓存吗？"
             confirm = input(f"{message} (y/n): ")
@@ -338,7 +298,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return _verify_rag_command()
 
     if args.command == "self-test":
-        _self_test_command(target=args.target, output_dir=args.output_dir)
+        _self_test_command(target=args.target)
         return 0
 
     if args.command == "ltm-review":

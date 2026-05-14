@@ -1,4 +1,5 @@
 import scripts.cli as cli
+import pytest
 
 
 def test_cli_package_dispatches_to_packager(monkeypatch):
@@ -58,51 +59,28 @@ def test_cli_verify_rag_returns_command_exit_code(monkeypatch):
     assert cli.main(["verify-rag"]) == 1
 
 
-def test_cli_renderer_self_test_passes_output_dir(monkeypatch):
+def test_cli_validator_self_test_dispatch(monkeypatch):
     calls = {}
 
-    def fake_self_test(target, output_dir=None):
+    def fake_self_test(target):
         calls["target"] = target
-        calls["output_dir"] = output_dir
 
     monkeypatch.setattr(cli, "_self_test_command", fake_self_test)
 
     exit_code = cli.main([
         "self-test",
-        "renderer",
-        "--output-dir",
-        "tmp-output",
+        "validator",
     ])
 
     assert exit_code == 0
-    assert calls == {"target": "renderer", "output_dir": "tmp-output"}
+    assert calls == {"target": "validator"}
 
 
-def test_cli_run_passes_bundle_and_model_slot(monkeypatch):
-    calls = {}
+def test_cli_no_longer_exposes_legacy_run_command():
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["run"])
 
-    def fake_run(no_cache, bundle_path=None, model_slot=None):
-        calls["no_cache"] = no_cache
-        calls["bundle_path"] = bundle_path
-        calls["model_slot"] = model_slot
-
-    monkeypatch.setattr(cli, "_run_pipeline_command", fake_run)
-
-    exit_code = cli.main([
-        "run",
-        "--no-cache",
-        "--bundle",
-        "bundle.json",
-        "--model-slot",
-        "model_slot_3",
-    ])
-
-    assert exit_code == 0
-    assert calls == {
-        "no_cache": True,
-        "bundle_path": "bundle.json",
-        "model_slot": "model_slot_3",
-    }
+    assert exc.value.code == 2
 
 
 def test_cli_ltm_review_dispatch(monkeypatch):

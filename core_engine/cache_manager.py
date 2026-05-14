@@ -8,9 +8,9 @@ from typing import Any, Dict, Optional
 
 class CacheManager:
     """
-    剧本解析结果缓存管理器 (Cache Manager)
-    职责：为每一个剧本文件（基于 MD5 内容指纹）存储解析后的 JSON 结构，避免重复调用 LLM 造成 Token 浪费。
-    支持“精准清理”功能，允许根据剧本标题关键词批量删除特定缓存。
+    章节生产快照缓存管理器 (Cache Manager)
+    职责：为章节生产过程中的中间数据存储 JSON 快照，避免重复调用 LLM 造成 Token 浪费。
+    支持“精准清理”功能，允许根据书名、题材或章节关键词批量删除特定缓存。
     """
     def __init__(self, cache_dir: str):
         self.cache_dir = cache_dir
@@ -20,7 +20,7 @@ class CacheManager:
     def _get_hash(self, content: str, salt: str = "") -> str:
         """
         计算内容的指纹哈希。
-        由于不同题材的剧本内容可能雷同，建议配置时加入基于 Prompt 版本的 salt。
+        由于不同题材的章节内容可能雷同，建议配置时加入基于 Prompt 版本的 salt。
         """
         combined = f"{content}:{salt}"
         return hashlib.sha256(combined.encode("utf-8")).hexdigest()
@@ -35,8 +35,8 @@ class CacheManager:
     def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         """
         兼容旧格式缓存：
-        - 旧格式: 直接是 episode 字典
-        - 新格式: {"meta": {...}, "data": episode_dict}
+        - 旧格式: 直接是数据字典
+        - 新格式: {"meta": {...}, "data": data_dict}
         """
         if "data" in payload and isinstance(payload.get("data"), dict):
             return payload

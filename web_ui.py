@@ -218,7 +218,6 @@ DASHBOARD_SECTIONS = [
         "commands": [
             {"id": "mock_chapter", "label": "生成下一章", "icon": "✍️"},
             {"id": "mock_batch", "label": "批量生成章节", "icon": "📚"},
-            {"id": "pipeline", "label": "运行核心流水线", "icon": "🚀"},
         ],
     },
     {
@@ -237,16 +236,14 @@ DASHBOARD_SECTIONS = [
         "description": "章节质检、自检和番茄小说存稿包导出。",
         "commands": [
             {"id": "diag_validator", "label": "番茄章节质检自检", "icon": "🧪"},
-            {"id": "diag_renderer", "label": "渲染引擎自检", "icon": "🎨"},
             {"id": "export_fanqie", "label": "导出番茄存稿", "icon": "📦"},
         ],
     },
     {
         "title": "系统工具",
         "tone": "module-system",
-        "description": "统计、缓存和控制台进程管理。",
+        "description": "缓存、模型诊断和控制台进程管理。",
         "commands": [
-            {"id": "stats", "label": "查看统计数据", "icon": "📊"},
             {"id": "model_diag", "label": "模型诊断", "icon": "🧬"},
             {"id": "cache", "label": "清理缓存", "icon": "🧹"},
             {"id": "exit", "label": "关闭网页控制台", "icon": "🚪", "danger": True},
@@ -389,15 +386,12 @@ async def run_command(command: str, request: Request):
     # Map API commands to actual python CLI commands
     cmd_map = {
         "preflight": [py, "-m", "scripts.cli", "new-book", "test_demo", "--format", "real"],
-        "pipeline": [py, "-m", "scripts.cli", "run"],
         "feed": [py, "-m", "core_engine.update_kb", "test_demo"],
         "export_fanqie": [py, "-m", "scripts.cli", "export-fanqie", "--name", "demo_project", "--genre", "番茄小说", "--author", "none"],
         "full_flow": [py, "-m", "scripts.cli", "new-book", "test_demo", "--format", "real"], # simplified
-        "stats": [py, "-m", "scripts.cli", "stats"],
         "inspire": [py, "-m", "core_engine.inspire", "test_demo"],
         "cache": [py, "-m", "scripts.cli", "clear-cache", "--yes"],
         "diag_validator": [py, "-m", "scripts.cli", "self-test", "validator"],
-        "diag_renderer": [py, "-m", "scripts.cli", "self-test", "renderer"]
     }
     
     if command == "exit":
@@ -421,9 +415,6 @@ async def run_command(command: str, request: Request):
         return {"output": "未知命令"}
 
     cmd = list(cmd_map[command])
-    if selected_model_slot and command in {"pipeline"}:
-        cmd.extend(["--model-slot", selected_model_slot])
-        
     try:
         # Run command and capture output
         # cwd ensures scripts find their relative paths (e.g. data folders) correctly

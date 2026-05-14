@@ -39,16 +39,13 @@ def test_model_options_exposes_slots(monkeypatch):
     assert payload["models"][1]["enabled"] is False
 
 
-def test_run_command_passes_model_slot_to_pipeline(monkeypatch):
-    captured = {}
-
+def test_web_ui_no_longer_exposes_legacy_pipeline_command(monkeypatch):
     class FakeRequest:
         async def json(self):
             return {"model_slot": "model_slot_4"}
 
     def fake_run(cmd, capture_output, text, cwd, encoding, errors):
-        captured["cmd"] = cmd
-        return SimpleNamespace(stdout="ok", stderr="", returncode=0)
+        raise AssertionError("legacy pipeline command must not run")
 
     monkeypatch.setattr(web_ui.subprocess, "run", fake_run)
     response = web_ui.run_command
@@ -57,8 +54,12 @@ def test_run_command_passes_model_slot_to_pipeline(monkeypatch):
 
     payload = asyncio.run(response("pipeline", FakeRequest()))
 
-    assert payload["output"] == "ok"
-    assert captured["cmd"][-2:] == ["--model-slot", "model_slot_4"]
+    assert payload["output"] == "未知命令"
+    assert "pipeline" not in {
+        command["id"]
+        for section in web_ui.DASHBOARD_SECTIONS
+        for command in section["commands"]
+    }
 
 
 def test_generated_file_catalog_lists_default_app_open_url(tmp_path):
