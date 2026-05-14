@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from typing import Optional, Sequence
 
@@ -47,6 +48,97 @@ def _package_command(project_name: str, genre: str, author_name: str) -> str:
     )
 
 
+def _new_book_command(
+    topic: str,
+    format_lane: str,
+    author: str,
+    no_rag: bool,
+    output: Optional[str] = None,
+    save_bundle: Optional[str] = None,
+) -> int:
+    from scripts.preflight import main as run_preflight
+
+    argv = [topic, "--format", format_lane, "--author", author]
+    if no_rag:
+        argv.append("--no-rag")
+    if output:
+        argv.extend(["--output", output])
+    if save_bundle:
+        argv.extend(["--save-bundle", save_bundle])
+    return run_preflight(argv)
+
+
+def _next_chapter_command(
+    title: str,
+    chapter_index: int,
+    project_id: str,
+    previous_writeback: str,
+    model_slot: Optional[str],
+    output_root: str,
+) -> int:
+    from chapter_pipeline import ChapterOrchestrator, ChapterPipelineInput
+
+    output = ChapterOrchestrator().run_mock_chapter(
+        project_goal="番茄小说章节生产",
+        chapter_input=ChapterPipelineInput(
+            project_bundle={"project_id": project_id, "project_title": project_id},
+            current_chapter=title,
+            previous_chapter_writeback=previous_writeback,
+            local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
+            search_summary="CLI: 搜索摘要占位。",
+            chapter_index=chapter_index,
+            model_slot=model_slot or "",
+        ),
+        output_root=output_root,
+    )
+    print(json.dumps(output.to_dict(), ensure_ascii=False, indent=2))
+    return 0
+
+
+def _batch_chapters_command(
+    titles: Sequence[str],
+    project_id: str,
+    start_index: int,
+    previous_writeback: str,
+    model_slot: Optional[str],
+    output_root: str,
+) -> int:
+    from chapter_pipeline import ChapterOrchestrator
+
+    outputs = ChapterOrchestrator().run_mock_batch(
+        project_goal="番茄小说章节生产",
+        chapter_titles=titles,
+        project_bundle={"project_id": project_id, "project_title": project_id},
+        initial_previous_writeback=previous_writeback,
+        local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
+        search_summary="CLI: 搜索摘要占位。",
+        output_root=output_root,
+        model_slot=model_slot or "",
+        start_index=start_index,
+    )
+    print(json.dumps([item.to_dict() for item in outputs], ensure_ascii=False, indent=2))
+    return 0
+
+
+def _search_diagnose_command(query: str, max_results: int) -> int:
+    from rag_engine.search_aggregator import SearchAggregator
+
+    payload = SearchAggregator(local_kb_dir=os.path.join(_get_workspace(), "knowledge_base")).search(
+        query,
+        max_results_per_source=max_results,
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _model_diagnose_command() -> int:
+    from core_engine.config_loader import load_config
+
+    cfg = load_config()
+    print(json.dumps(cfg.get("models", {}), ensure_ascii=False, indent=2))
+    return 0
+
+
 def _verify_rag_command() -> int:
     from scripts.verify_bailian_rag import verify
 
@@ -90,10 +182,46 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="番茄小说一键制造机 CLI 控制台")
     subparsers = parser.add_subparsers(dest="command", help="选择子命令")
 
-    run_parser = subparsers.add_parser("run", help="启动章节流水线处理 drafts/ 文件夹")
+    new_book_parser = subparsers.add_parser("new-book", help="新书立项评审（番茄小说）")
+    new_book_parser.add_argument("topic", help="项目题材/关键词")
+    new_book_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["real", "ai", "mixed"],
+        default="real",
+        help="章节形态: real=正文连载型, ai=设定辅助型, mixed=混合增强型",
+    )
+    new_book_parser.add_argument("--author", default="default", help="作者ID")
+    new_book_parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
+    new_book_parser.add_argument("--output", "-o", help="额外保存 Markdown 报告到指定路径")
+    new_book_parser.add_argument("--save-bundle", help="保存 ContextBundle JSON 到指定目录或文件")
+
+    run_parser = subparsers.add_parser("run", help="启动番茄小说章节流水线处理 drafts/ 文件夹")
     run_parser.add_argument("--no-cache", action="store_true", help="忽略现有解析快照，强制重新调用 LLM")
     run_parser.add_argument("--bundle", help="前置立项 ContextBundle JSON 路径，用于注入新书上下文")
     run_parser.add_argument("--model-slot", help="选择 OpenAI Chat Completions 模型槽位，例如 model_slot_1")
+
+    next_parser = subparsers.add_parser("next-chapter", help="生成下一章 mock 产物并写入 novel_outputs")
+    next_parser.add_argument("title", help="当前章标题，例如 第一章：旧城来信")
+    next_parser.add_argument("--chapter-index", type=int, default=1, help="章节序号")
+    next_parser.add_argument("--project-id", default="cli_demo", help="项目ID/书名 slug")
+    next_parser.add_argument("--previous-writeback", default="新书开局，无上一章回写。", help="上一章第9步回写")
+    next_parser.add_argument("--model-slot", help="模型槽位")
+    next_parser.add_argument("--output-root", default="novel_outputs", help="输出目录")
+
+    batch_parser = subparsers.add_parser("batch-chapters", help="批量生成章节 mock 产物")
+    batch_parser.add_argument("titles", nargs="+", help="章节标题列表")
+    batch_parser.add_argument("--project-id", default="cli_demo", help="项目ID/书名 slug")
+    batch_parser.add_argument("--start-index", type=int, default=1, help="起始章节序号")
+    batch_parser.add_argument("--previous-writeback", default="新书开局，无上一章回写。", help="第一章前置回写")
+    batch_parser.add_argument("--model-slot", help="模型槽位")
+    batch_parser.add_argument("--output-root", default="novel_outputs", help="输出目录")
+
+    search_parser = subparsers.add_parser("search-diagnose", help="搜索诊断：Brave/Tavily/本地知识库聚合")
+    search_parser.add_argument("query", help="搜索关键词")
+    search_parser.add_argument("--max-results", type=int, default=2, help="每个来源最多返回条数")
+
+    subparsers.add_parser("model-diagnose", help="模型诊断：查看 5 个 OpenAI Chat Completions 槽位")
 
     clear_parser = subparsers.add_parser("clear-cache", help="清理渲染缓存数据")
     clear_parser.add_argument("--filter", type=str, help="根据关键词筛选清理特定题材或章节快照")
@@ -105,6 +233,11 @@ def build_parser() -> argparse.ArgumentParser:
     package_parser.add_argument("--name", required=True, help="项目名/书名")
     package_parser.add_argument("--genre", required=True, help="题材或投稿赛道")
     package_parser.add_argument("--author", required=True, help="笔名或工作室名")
+
+    export_parser = subparsers.add_parser("export-fanqie", help="导出番茄小说存稿包")
+    export_parser.add_argument("--name", required=True, help="项目名/书名")
+    export_parser.add_argument("--genre", required=True, help="题材或投稿赛道")
+    export_parser.add_argument("--author", required=True, help="笔名或工作室名")
 
     subparsers.add_parser("verify-rag", help=argparse.SUPPRESS)
 
@@ -123,6 +256,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "new-book":
+        return _new_book_command(
+            topic=args.topic,
+            format_lane=args.format,
+            author=args.author,
+            no_rag=args.no_rag,
+            output=args.output,
+            save_bundle=args.save_bundle,
+        )
+
     if args.command == "run":
         _run_pipeline_command(
             no_cache=args.no_cache,
@@ -130,6 +273,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             model_slot=args.model_slot,
         )
         return 0
+
+    if args.command == "next-chapter":
+        return _next_chapter_command(
+            title=args.title,
+            chapter_index=args.chapter_index,
+            project_id=args.project_id,
+            previous_writeback=args.previous_writeback,
+            model_slot=args.model_slot,
+            output_root=args.output_root,
+        )
+
+    if args.command == "batch-chapters":
+        return _batch_chapters_command(
+            titles=args.titles,
+            project_id=args.project_id,
+            start_index=args.start_index,
+            previous_writeback=args.previous_writeback,
+            model_slot=args.model_slot,
+            output_root=args.output_root,
+        )
+
+    if args.command == "search-diagnose":
+        return _search_diagnose_command(query=args.query, max_results=args.max_results)
+
+    if args.command == "model-diagnose":
+        return _model_diagnose_command()
 
     if args.command == "stats":
         _show_stats_command()
@@ -150,6 +319,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     if args.command == "package":
+        _package_command(
+            project_name=args.name,
+            genre=args.genre,
+            author_name=args.author,
+        )
+        return 0
+
+    if args.command == "export-fanqie":
         _package_command(
             project_name=args.name,
             genre=args.genre,

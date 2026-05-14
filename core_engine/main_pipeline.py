@@ -54,7 +54,7 @@ def _build_markdown(
     generated_at: str,
 ) -> str:
     lines: List[str] = []
-    lines.append("# 红果剧本工业化流水线执行报告")
+    lines.append("# 番茄小说章节流水线执行报告")
     lines.append("")
     lines.append(f"**生成时间**: {generated_at}")
     lines.append("**处理统计**: 成功 {0} / 失败 {1} / 总计 {2}".format(
@@ -120,7 +120,7 @@ def show_stats(config: dict):
     print("\n" + "=" * 20 + " 流水线资产盘点 " + "=" * 20)
     if os.path.exists(abs_drafts):
         files = [f for f in os.listdir(abs_drafts) if f.endswith((".txt", ".md"))]
-        print(f"待处理草草 (drafts/): {len(files)} 篇")
+        print(f"待处理草稿 (drafts/): {len(files)} 篇")
     
     if os.path.exists(abs_output):
         files = [f for f in os.listdir(abs_output) if f.endswith(".txt")]
@@ -131,10 +131,10 @@ def show_stats(config: dict):
 
 def main(no_cache: bool = False, bundle_path: str = None, model_slot: str = None) -> None:
     """
-    红果剧本工业化流水线执行入口 - 满足高并发与高质量双重需求
+    番茄小说章节流水线执行入口 - 满足批量处理与章节质检需求
     """
     print("=" * 60)
-    print("红果剧本工业化流水线执行入口 - 自动化开始运行")
+    print("番茄小说章节流水线执行入口 - 自动化开始运行")
     print("=" * 60 + "\n")
 
     # 优先加载配置，确保后续所有组件共享同一个 config 实例以优化 I/O 与测试性

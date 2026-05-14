@@ -108,7 +108,7 @@ if /I "%RAG_OPT%"=="N" set "NO_RAG=--no-rag"
 
 echo.
 echo 🧭 正在启动前置中台评审...
-python -m scripts.preflight "%TOPIC%" --format %FORMAT% %NO_RAG%
+python -m scripts.cli new-book "%TOPIC%" --format %FORMAT% %NO_RAG%
 set "LAST_ERROR=%ERRORLEVEL%"
 goto end_action
 
@@ -129,7 +129,7 @@ if not exist "%BUNDLE_DIR%" mkdir "%BUNDLE_DIR%"
 
 echo.
 echo 🧭 [1/2] 正在执行番茄小说前置立项...
-python -m scripts.preflight "%TOPIC%" --format %FORMAT% %NO_RAG% --save-bundle "%BUNDLE_DIR%"
+python -m scripts.cli new-book "%TOPIC%" --format %FORMAT% %NO_RAG% --save-bundle "%BUNDLE_DIR%"
 set "LAST_ERROR=%ERRORLEVEL%"
 if not "%LAST_ERROR%"=="0" goto end_action
 
@@ -181,7 +181,7 @@ if "%AUTHOR_NAME%"=="" set "AUTHOR_NAME=未署名"
 
 echo.
 echo 📦 正在导出番茄小说存稿包...
-python -m scripts.cli package --name "%PROJECT_NAME%" --genre "%GENRE%" --author "%AUTHOR_NAME%"
+python -m scripts.cli export-fanqie --name "%PROJECT_NAME%" --genre "%GENRE%" --author "%AUTHOR_NAME%"
 set "LAST_ERROR=%ERRORLEVEL%"
 goto end_action
 
@@ -245,7 +245,7 @@ goto end_action
 echo.
 echo 🌐 正在启动番茄小说网页控制台...
 echo    地址: http://127.0.0.1:8543
-echo    已启用 Jinja2/uvicorn 热刷新；生成文件在网页右侧清单中直接打开。
+echo    已启用 Jinja2/uvicorn 热刷新；生成文件在网页右侧清单中用本机默认应用打开。
 start "" "http://127.0.0.1:8543"
 python web_ui.py
 set "LAST_ERROR=%ERRORLEVEL%"

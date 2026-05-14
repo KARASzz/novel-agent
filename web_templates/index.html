@@ -133,6 +133,159 @@
             font-size: 12px;
             line-height: 1.45;
         }
+        .orchestrator-dashboard {
+            border-top: 1px solid var(--line);
+            background: #fbfcfd;
+            padding: 14px;
+        }
+        .orchestrator-header, .subsection-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .orchestrator-header p {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .ledger-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .status-card, .agent-column, .stage6-group {
+            border: 1px solid #d6dde6;
+            border-radius: 8px;
+            background: white;
+            overflow: hidden;
+        }
+        .status-card {
+            padding: 10px;
+            min-height: 84px;
+        }
+        .status-card h3 {
+            margin: 0 0 6px;
+            font-size: 12px;
+            color: #5b6974;
+            font-weight: 600;
+        }
+        .status-card p {
+            min-height: 0;
+            margin: 0;
+            color: #17212b;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .status-card ul {
+            margin: 0;
+            padding-left: 16px;
+            color: #17212b;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .agent-columns {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .agent-column h3 {
+            margin: 0;
+            padding: 9px 10px;
+            background: #edf7fb;
+            font-size: 13px;
+        }
+        .task-list {
+            max-height: 220px;
+            overflow: auto;
+            padding: 8px;
+            display: grid;
+            gap: 6px;
+        }
+        .task-row {
+            border: 1px solid #e2e8ee;
+            border-radius: 6px;
+            padding: 7px;
+            background: #fbfdff;
+        }
+        .task-title {
+            font-size: 12px;
+            color: #17212b;
+            line-height: 1.35;
+        }
+        .task-meta {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.35;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 2px 7px;
+            font-size: 11px;
+            border: 1px solid #c9d3dc;
+            background: #f8fafc;
+            color: #334155;
+        }
+        .status-completed { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
+        .status-running { background: #fff7dd; border-color: #e7cc72; color: #745414; }
+        .status-failed { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
+        .stage6-board {
+            display: grid;
+            gap: 8px;
+        }
+        .stage6-group summary {
+            cursor: pointer;
+            padding: 9px 10px;
+            background: #f6f2ff;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .stage6-content {
+            padding: 9px 10px;
+            display: grid;
+            gap: 8px;
+        }
+        .stage-output {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px solid #e2e8ee;
+            border-radius: 6px;
+            background: #fbfdff;
+            padding: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #1f2933;
+            max-height: 150px;
+            overflow: auto;
+        }
+        .round-row {
+            border: 1px solid #e2e8ee;
+            border-radius: 6px;
+            padding: 8px;
+            background: #fff;
+        }
+        .round-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .diff-note {
+            color: #52616b;
+            font-size: 12px;
+            line-height: 1.45;
+            margin-bottom: 6px;
+        }
         .commands {
             display: grid;
             grid-template-columns: 1fr;
@@ -245,6 +398,8 @@
         @media (max-width: 980px) {
             .shell { grid-template-columns: 1fr; }
             .module-grid { grid-template-columns: 1fr; }
+            .ledger-grid { grid-template-columns: 1fr 1fr; }
+            .agent-columns { grid-template-columns: 1fr; }
             .model-panel { min-width: 0; flex-wrap: wrap; }
             select { min-width: 100%; }
             .right-column { grid-template-rows: auto; }
@@ -291,6 +446,27 @@
                 </section>
                 {% endfor %}
             </div>
+
+            <section class="orchestrator-dashboard">
+                <div class="orchestrator-header">
+                    <div>
+                        <h2>Orchestrator 状态账本</h2>
+                        <p id="orchestratorSource">读取章节编排状态中...</p>
+                    </div>
+                    <button type="button" onclick="loadOrchestratorStatus()">刷新状态</button>
+                </div>
+                <div id="ledgerBody" class="ledger-grid"></div>
+
+                <div class="subsection-head">
+                    <h2>Agent 层级与任务状态</h2>
+                </div>
+                <div id="agentBody" class="agent-columns"></div>
+
+                <div class="subsection-head">
+                    <h2>第6A / 第6B 产物差异</h2>
+                </div>
+                <div id="stage6Body" class="stage6-board"></div>
+            </section>
         </section>
 
         <aside class="right-column">
@@ -335,7 +511,155 @@
         </aside>
     </main>
 
+    <script id="initialOrchestratorStatus" type="application/json">{{ orchestrator_status | tojson }}</script>
     <script>
+        function statusBadge(status) {
+            const badge = document.createElement('span');
+            badge.className = `status-badge status-${status || 'pending'}`;
+            badge.textContent = status || 'pending';
+            return badge;
+        }
+
+        function appendTextList(container, items, emptyText) {
+            if (!items || !items.length) {
+                const p = document.createElement('p');
+                p.textContent = emptyText;
+                container.appendChild(p);
+                return;
+            }
+            const list = document.createElement('ul');
+            for (const item of items) {
+                const li = document.createElement('li');
+                li.textContent = item;
+                list.appendChild(li);
+            }
+            container.appendChild(list);
+        }
+
+        function createStatusCard(title, value, asList = false) {
+            const card = document.createElement('div');
+            card.className = 'status-card';
+            const h3 = document.createElement('h3');
+            h3.textContent = title;
+            card.appendChild(h3);
+            if (asList) {
+                appendTextList(card, value, '无');
+            } else {
+                const p = document.createElement('p');
+                p.textContent = value || '无';
+                card.appendChild(p);
+            }
+            return card;
+        }
+
+        function renderOrchestratorStatus(payload) {
+            if (!payload || !payload.ledger) return;
+            const ledger = payload.ledger;
+            document.getElementById('orchestratorSource').textContent =
+                `${payload.source_label || '状态源'}${payload.source_path ? ' · ' + payload.source_path : ''}`;
+
+            const ledgerBody = document.getElementById('ledgerBody');
+            ledgerBody.innerHTML = '';
+            ledgerBody.appendChild(createStatusCard('当前阶段', ledger.current_stage));
+            ledgerBody.appendChild(createStatusCard('当前任务', ledger.current_task));
+            ledgerBody.appendChild(createStatusCard('进度统计', `完成 ${ledger.completed_count || 0} / 待办 ${ledger.pending_count || 0} / 运行 ${ledger.running_count || 0} / 失败 ${ledger.failed_count || 0}`));
+            ledgerBody.appendChild(createStatusCard('下一步', ledger.next_step));
+            ledgerBody.appendChild(createStatusCard('风险', ledger.risks || [], true));
+            ledgerBody.appendChild(createStatusCard('人工裁决点', ledger.human_decisions || [], true));
+            ledgerBody.appendChild(createStatusCard('禁止事项', ledger.forbidden || [], true));
+
+            const agentBody = document.getElementById('agentBody');
+            agentBody.innerHTML = '';
+            for (const group of payload.agents || []) {
+                const column = document.createElement('section');
+                column.className = 'agent-column';
+                const title = document.createElement('h3');
+                title.textContent = `${group.level} · ${group.completed || 0}/${group.total || 0}`;
+                column.appendChild(title);
+                const list = document.createElement('div');
+                list.className = 'task-list';
+                for (const task of group.tasks || []) {
+                    const row = document.createElement('div');
+                    row.className = 'task-row';
+                    const head = document.createElement('div');
+                    head.className = 'round-head';
+                    const id = document.createElement('span');
+                    id.textContent = task.task_id;
+                    head.appendChild(id);
+                    head.appendChild(statusBadge(task.status));
+                    const taskTitle = document.createElement('div');
+                    taskTitle.className = 'task-title';
+                    taskTitle.textContent = task.title;
+                    const meta = document.createElement('div');
+                    meta.className = 'task-meta';
+                    meta.textContent = `${task.manager}${task.worker ? ' / ' + task.worker : ''} · retry ${task.retry_count || 0}`;
+                    row.appendChild(head);
+                    row.appendChild(taskTitle);
+                    row.appendChild(meta);
+                    list.appendChild(row);
+                }
+                column.appendChild(list);
+                agentBody.appendChild(column);
+            }
+
+            const stage6Body = document.getElementById('stage6Body');
+            stage6Body.innerHTML = '';
+            for (const group of (payload.stage6 && payload.stage6.beat_groups) || []) {
+                const details = document.createElement('details');
+                details.className = 'stage6-group';
+                details.open = true;
+                const summary = document.createElement('summary');
+                summary.textContent = `节拍 ${group.label}：6A 两节拍草稿 + 6B 六轮单要素迭代`;
+                details.appendChild(summary);
+                const content = document.createElement('div');
+                content.className = 'stage6-content';
+
+                const draftHead = document.createElement('div');
+                draftHead.className = 'round-head';
+                const draftTitle = document.createElement('span');
+                draftTitle.textContent = '第6A 两节拍产物';
+                draftHead.appendChild(draftTitle);
+                draftHead.appendChild(statusBadge((group.draft || {}).status));
+                const draftOutput = document.createElement('pre');
+                draftOutput.className = 'stage-output';
+                draftOutput.textContent = (group.draft && group.draft.content) || '待执行：暂无第6A产物。';
+                content.appendChild(draftHead);
+                content.appendChild(draftOutput);
+
+                for (const round of group.rounds || []) {
+                    const row = document.createElement('div');
+                    row.className = 'round-row';
+                    const head = document.createElement('div');
+                    head.className = 'round-head';
+                    const title = document.createElement('span');
+                    title.textContent = `第6B-${round.round_index}轮：${round.round_name}`;
+                    head.appendChild(title);
+                    head.appendChild(statusBadge(round.status));
+                    const diff = document.createElement('div');
+                    diff.className = 'diff-note';
+                    diff.textContent = round.diff_note || '';
+                    const output = document.createElement('pre');
+                    output.className = 'stage-output';
+                    output.textContent = round.content || '待执行：暂无本轮产物。';
+                    row.appendChild(head);
+                    row.appendChild(diff);
+                    row.appendChild(output);
+                    content.appendChild(row);
+                }
+                details.appendChild(content);
+                stage6Body.appendChild(details);
+            }
+        }
+
+        async function loadOrchestratorStatus() {
+            try {
+                const response = await fetch('/api/orchestrator-status');
+                renderOrchestratorStatus(await response.json());
+            } catch (error) {
+                document.getElementById('orchestratorSource').textContent = `Orchestrator 状态读取失败: ${error}`;
+            }
+        }
+
         async function loadModels() {
             const select = document.getElementById('modelSelect');
             const hint = document.getElementById('modelHint');
@@ -457,8 +781,15 @@
         }
 
         loadModels();
+        try {
+            renderOrchestratorStatus(JSON.parse(document.getElementById('initialOrchestratorStatus').textContent || '{}'));
+        } catch (error) {
+            loadOrchestratorStatus();
+        }
         loadGeneratedFiles();
+        loadOrchestratorStatus();
         setInterval(loadGeneratedFiles, 5000);
+        setInterval(loadOrchestratorStatus, 5000);
     </script>
 </body>
 </html>

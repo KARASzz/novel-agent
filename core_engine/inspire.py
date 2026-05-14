@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: python -m core_engine.inspire <剧本题材/关键词>")
+        print("用法: python -m core_engine.inspire <小说题材/关键词>")
         sys.exit(1)
         
     topic = sys.argv[1]
@@ -78,12 +78,12 @@ def main():
 
     # 指令标准化：保持 instructions 静态以优化 Session Cache
     instructions = (
-        "你现在是一位千万级爆款短剧制作人。请依据提供的全网实时检索素材，深度提炼该题材的核心套路，并输出一份极具商业价值的“灵感提示卡（Pitch Card）”。\n\n"
+        "你现在是一位专注番茄小说的爆款网文策划。请依据提供的全网实时检索素材，深度提炼该题材的核心套路，并输出一份极具商业价值的“灵感提示卡（Pitch Card）”。\n\n"
         "【输出规范】：\n"
         "请使用漂亮的 Markdown 格式输出，内容不需要任何铺垫，直接开始。必须包含以下模块：\n"
         "## 1. 题材一句话判词 (Logline)\n"
         "## 2. 最热人设反差公式\n"
-        "## 3. 前三集钩子设计指南 (Hooks)\n"
+        "## 3. 前三章追读钩子设计指南 (Hooks)\n"
         "## 4. 经典反转套路提取\n\n"
         "⚠️ 警告：要求语言锋利、直击商业痛点，排除一切空套话，必须输出干货！"
     )

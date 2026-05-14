@@ -6,7 +6,7 @@ import subprocess
 import uvicorn
 import os
 import sys
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List, Optional
 
 from core_engine.config_loader import load_config
 from web_file_catalog import GeneratedFileCatalog
@@ -38,6 +38,167 @@ except AttributeError:  # pragma: no cover - fallback template shim
     pass
 
 file_catalog = GeneratedFileCatalog(BASE_DIR)
+
+
+def _latest_execution_plan_path() -> Optional[Path]:
+    output_root = Path(BASE_DIR) / "novel_outputs"
+    if not output_root.exists():
+        return None
+    candidates = [path for path in output_root.rglob("execution_plan.json") if path.is_file()]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _load_or_build_plan_snapshot() -> Dict[str, Any]:
+    latest_plan = _latest_execution_plan_path()
+    if latest_plan:
+        try:
+            return {
+                "source": "latest_execution_plan",
+                "source_label": "最近一次章节运行",
+                "source_path": str(latest_plan),
+                "plan": json.loads(latest_plan.read_text(encoding="utf-8")),
+            }
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    from chapter_pipeline import ChapterOrchestrator
+
+    plan = ChapterOrchestrator().build_plan(
+        project_goal="番茄小说章节生产",
+        current_chapter="第一章：控制台预览章",
+        previous_chapter_script="控制台预览：上一章第9步回写占位。",
+        project_bundle={"project_id": "console_preview", "project_title": "控制台预览"},
+        local_kb_reference="控制台预览：本地知识库摘要占位。",
+        search_summary="控制台预览：Brave/Tavily 搜索摘要占位。",
+        chapter_index=1,
+    )
+    return {
+        "source": "preview_plan",
+        "source_label": "待执行预览计划",
+        "source_path": "",
+        "plan": plan.to_dict(),
+    }
+
+
+def _task_card(task: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "task_id": task.get("task_id", ""),
+        "title": task.get("title", ""),
+        "agent_level": task.get("agent_level", ""),
+        "manager": task.get("manager", ""),
+        "worker": task.get("worker") or "",
+        "status": task.get("status", "pending"),
+        "retry_count": task.get("retry_count", 0),
+        "failure_reason": task.get("failure_reason") or "",
+        "depends_on": task.get("depends_on", []),
+        "execution_mode": task.get("execution_mode", "serial"),
+        "can_run_parallel": bool(task.get("can_run_parallel", False)),
+        "final_decision": task.get("final_decision") or "",
+        "summary": str((task.get("output_payload") or {}).get("summary", "")),
+        "content": str((task.get("output_payload") or {}).get("content", "")),
+    }
+
+
+def _diff_note(previous_content: str, current_content: str, round_name: str) -> str:
+    if not current_content:
+        return "待执行：本轮尚未产生产物。"
+    if not previous_content:
+        return f"本轮首次形成 {round_name} 迭代产物。"
+    if previous_content == current_content:
+        return f"本轮聚焦 {round_name}，但 mock 产物未体现文本差异。"
+    return f"相对上一轮，本轮只处理 {round_name}，不混合改写其他五个要素。"
+
+
+def _orchestrator_status_payload() -> Dict[str, Any]:
+    from chapter_pipeline.orchestrator import BEAT_GROUPS, SIX_B_ITERATION_ROUNDS
+
+    snapshot = _load_or_build_plan_snapshot()
+    plan = snapshot["plan"]
+    tasks: List[Dict[str, Any]] = [_task_card(task) for task in plan.get("tasks", [])]
+    task_map = {task["task_id"]: task for task in tasks}
+    ledger = dict(plan.get("ledger", {}))
+    completed = list(ledger.get("completed", []))
+    pending = list(ledger.get("pending", []))
+    running = [task["task_id"] for task in tasks if task["status"] == "running"]
+    failed = [task["task_id"] for task in tasks if task["status"] == "failed"]
+    if running:
+        current_task = running[0]
+    elif pending:
+        current_task = pending[0]
+    elif completed:
+        current_task = completed[-1]
+    else:
+        current_task = str(ledger.get("current_stage", "not_started"))
+
+    agent_levels = ["CEO Agent", "Manager Agent", "Worker Agent"]
+    agents = []
+    for level in agent_levels:
+        level_tasks = [task for task in tasks if task["agent_level"] == level]
+        agents.append(
+            {
+                "level": level,
+                "total": len(level_tasks),
+                "completed": sum(1 for task in level_tasks if task["status"] == "completed"),
+                "running": sum(1 for task in level_tasks if task["status"] == "running"),
+                "failed": sum(1 for task in level_tasks if task["status"] == "failed"),
+                "pending": sum(1 for task in level_tasks if task["status"] == "pending"),
+                "tasks": level_tasks,
+            }
+        )
+
+    stage6_groups = []
+    for left, right in BEAT_GROUPS:
+        group_id = f"beats_{left}_{right}"
+        draft = task_map.get(f"stage_6a_{group_id}", {})
+        draft_content = str(draft.get("content", ""))
+        previous_content = draft_content
+        rounds = []
+        for round_index, round_name in enumerate(SIX_B_ITERATION_ROUNDS, start=1):
+            task = task_map.get(f"stage_6b_{group_id}_round_{round_index}", {})
+            content = str(task.get("content", ""))
+            rounds.append(
+                {
+                    "round_index": round_index,
+                    "round_name": round_name,
+                    "task_id": task.get("task_id", ""),
+                    "status": task.get("status", "pending"),
+                    "summary": task.get("summary", ""),
+                    "content": content,
+                    "diff_note": _diff_note(previous_content, content, round_name),
+                }
+            )
+            if content:
+                previous_content = content
+        stage6_groups.append(
+            {
+                "label": f"{left}-{right}",
+                "draft": draft,
+                "rounds": rounds,
+            }
+        )
+
+    ledger.update(
+        {
+            "completed_count": len(completed),
+            "pending_count": len(pending),
+            "running_count": len(running),
+            "failed_count": len(failed),
+            "current_task": current_task,
+        }
+    )
+    return {
+        "source": snapshot["source"],
+        "source_label": snapshot["source_label"],
+        "source_path": snapshot["source_path"],
+        "ledger": ledger,
+        "agents": agents,
+        "stage6": {
+            "beat_groups": stage6_groups,
+            "six_b_rounds": list(SIX_B_ITERATION_ROUNDS),
+        },
+    }
 
 
 DASHBOARD_SECTIONS = [
@@ -102,6 +263,7 @@ async def read_root(request: Request):
             "sections": DASHBOARD_SECTIONS,
             "dev_reload_enabled": True,
             "file_groups": file_catalog.list_files(),
+            "orchestrator_status": _orchestrator_status_payload(),
         },
     )
 
@@ -139,6 +301,11 @@ async def list_models():
 @app.get("/api/generated-files")
 async def generated_files():
     return file_catalog.list_files()
+
+
+@app.get("/api/orchestrator-status")
+async def orchestrator_status():
+    return _orchestrator_status_payload()
 
 
 @app.post("/api/open-file/{file_id}")
@@ -221,11 +388,11 @@ async def run_command(command: str, request: Request):
     py = sys.executable
     # Map API commands to actual python CLI commands
     cmd_map = {
-        "preflight": [py, "-m", "scripts.preflight", "test_demo", "--format", "real"],
+        "preflight": [py, "-m", "scripts.cli", "new-book", "test_demo", "--format", "real"],
         "pipeline": [py, "-m", "scripts.cli", "run"],
         "feed": [py, "-m", "core_engine.update_kb", "test_demo"],
-        "export_fanqie": [py, "-m", "scripts.cli", "package", "--name", "demo_project", "--genre", "番茄小说", "--author", "none"],
-        "full_flow": [py, "-m", "scripts.preflight", "test_demo", "--format", "real"], # simplified
+        "export_fanqie": [py, "-m", "scripts.cli", "export-fanqie", "--name", "demo_project", "--genre", "番茄小说", "--author", "none"],
+        "full_flow": [py, "-m", "scripts.cli", "new-book", "test_demo", "--format", "real"], # simplified
         "stats": [py, "-m", "scripts.cli", "stats"],
         "inspire": [py, "-m", "core_engine.inspire", "test_demo"],
         "cache": [py, "-m", "scripts.cli", "clear-cache", "--yes"],

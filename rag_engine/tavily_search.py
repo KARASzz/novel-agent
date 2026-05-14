@@ -13,7 +13,7 @@ class TavilySearcher:
     """
     网络智能雷达 (Tavily Web Searcher)
     核心职能：接入具有实时获取网络最新数据能力的 Tavily Search API，
-    专门用于扫描当下流媒体平台（抖音/快手/红果）的最新爆榜短剧题材元素。
+    专门用于扫描番茄小说与网文市场的最新爆款题材、追读钩子和平台规则。
     """
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.environ.get("TAVILY_API_KEY")
@@ -31,7 +31,7 @@ class TavilySearcher:
 
         payload = {
             "api_key": self.api_key,
-            "query": f"短剧 爆款 分析 {query}",
+            "query": f"番茄小说 网文 爆款 追读 分析 {query}",
             "search_depth": "advanced", # 深度挖掘
             "include_answer": True,
             "max_results": max_results
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     searcher = TavilySearcher()
     if searcher.api_key:
         print("\n=== Tavily 活体雷达下潜测试 ===")
-        results = searcher.search_hot_trends("真假千金 马甲掉落")
+        results = searcher.search_hot_trends("都市逆袭 马甲掉落")
         for idx, r in enumerate(results):
             print(f"\n[{idx+1}] {r.get('title')}\n> 摘要: {r.get('content')[:120]}...\n> 链接: {r.get('url')}")
     else:
