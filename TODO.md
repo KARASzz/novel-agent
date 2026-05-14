@@ -84,6 +84,21 @@
 - [x] 支持批量连续生成章节，但每章都必须以上一章回写作为连续性输入。
 - [x] 将章节产物写入新的小说输出目录，避免继续使用短剧命名。
 
+## 4A. 小说大纲中台补全
+
+- [x] 明确立项通过后不再直接进入章节正文生产，必须先经过小说大纲中台。
+- [x] 将根目录 `webnovel_outline_template_v1.md` 作为全书宏观大纲正式源模板。
+- [x] 将根目录 `webnovel_setting_bible_template_v1.md` 作为设定集正式源模板。
+- [x] 新增 `webnovel_orchestration_template_v1.md`，定义大纲中台流程、Agent职责、人工闸门、失败重试和禁止事项。
+- [x] 新增 `webnovel_volume_story_list_template_v1.md`，定义4个卷Agent的每卷100章极简故事清单。
+- [x] 新增 `webnovel_chapter_construction_card_template_v1.md`，定义进入九步流程前的章级施工卡。
+- [x] 新增 `webnovel_handoff_gate_template_v1.md`，检查“大纲 -> 设定集 -> 卷故事清单 -> 施工卡 -> 九步第1步”的交接。
+- [x] 固化全书400章结构：4卷、每卷100章、每卷4弧、每弧25章、每弧4单元。
+- [x] 固化每弧单元章数为 `6/6/6/7`，6章单元按 `1-2-2-1` 分配起承转合，7章单元按 `1-2-2-2` 分配。
+- [x] 新增大纲中台结构模块，支持生成400章结构槽位与4个卷Agent职责边界。
+- [x] 扩展九步流程第1步接口，支持 `chapter_construction_card` 与 `chapter_setting_payload`。
+- [x] 保持九步流程第2-9步不变。
+
 ## 5. 番茄小说质检与导出
 
 - [x] 新增番茄小说章节质检器。

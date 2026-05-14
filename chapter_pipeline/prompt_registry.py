@@ -140,17 +140,26 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
       【当前章节名】
     </current_chapter>
 
+    <chapter_construction_card>
+      【章级施工卡：只包含当前章任务书，不得粘贴全书大纲】
+    </chapter_construction_card>
+
+    <chapter_setting_payload>
+      【从设定集抽取的本章必要规则、术语、人物、地点、美学素材】
+    </chapter_setting_payload>
+
     <previous_chapter_script>
       【上一章第9步章节走向极简脚本回写】
     </previous_chapter_script>
   </input>
 
   <source_priority>
-    <level_1>当前项目包：抽取本章剧情目标、人物边界、连续性红线</level_1>
-    <level_2>本轮增量补丁：抽取当前有效的新机制、新红线、新人物边界</level_2>
-    <level_3>生产线：抽取流程规则</level_3>
-    <level_4>美学基座：抽取本章可用物件、声音、身体信号、系统反馈</level_4>
-    <level_5>旧版资产库：只抽规则卡、认知可达性、角色三字段、本章主惊异</level_5>
+    <level_1>章级施工卡：决定当前章要完成什么、不能发生什么、章尾钩子指向什么</level_1>
+    <level_2>章节设定抽取包：只调用本章必要规则、术语、人物、地点和美学素材</level_2>
+    <level_3>上一章第9步回写：抽取上一章遗留状态、未解除风险和必须承接项</level_3>
+    <level_4>当前项目包：只在施工卡信息不足时补齐人物边界、连续性红线</level_4>
+    <level_5>生产线：抽取流程规则</level_5>
+    <level_6>旧版资产库：只抽规则卡、认知可达性、角色三字段、本章主惊异</level_6>
   </source_priority>
 
   <extraction_targets>
@@ -159,35 +168,37 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
     </target>
 
     <target name="current_chapter_seed">
-      从当前章节名、项目包和补丁中抽取本章必须推进的核心事件。
+      优先从章级施工卡抽取本章必须推进的核心事件。
+      如果施工卡缺项，再从当前章节名、项目包和补丁中补齐。
       只保留本章要写的目标，不扩写后续大纲。
       必须能一句话说清。
     </target>
 
     <target name="current_chapter_guardrails">
-      从连续性红线、机制边界和补丁中抽取本章禁止事项。
+      优先从章级施工卡 must_not_write 抽取本章禁止事项。
+      再从连续性红线、机制边界和补丁中补足风险项。
       优先抽取会导致规则写穿、主角越权、系统万能化、概念过载的风险。
     </target>
 
     <target name="allowed_concepts">
-      抽取本章允许出现的新概念。
+      从章节设定抽取包中抽取本章允许出现的新概念。
       最多2个。
       建构级最多1个。
       过载概念必须推迟。
     </target>
 
     <target name="rule_cards">
-      抽取本章最多2条规则卡。
+      从章节设定抽取包中抽取本章最多2条规则卡。
       每条规则卡只保留：能做、不能做、触发条件、权限边界、本章可见后果、本章禁止写法。
     </target>
 
     <target name="character_constraints">
-      抽取最多2个人物三字段。
+      从章级施工卡和章节设定抽取包中抽取最多2个人物三字段。
       每个人物只写：顽固预测、默认动作、崩溃阈值。
     </target>
 
     <target name="aesthetic_payload">
-      抽取本章可用的美学素材。
+      从章节设定抽取包中抽取本章可用的美学素材。
       只保留物件、声音、身体小信号、系统反馈。
       不生成气氛散文。
     </target>
@@ -207,6 +218,11 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
     <check id="concept_overload">
       本章新概念是否超过2个？
       如果超过，保留最必要的2个，其余标记为“推迟”。
+    </check>
+
+    <check id="single_chapter_card_only">
+      是否把整份全书大纲、整份设定集或整卷故事清单塞入当前章？
+      如果出现，判定输入污染，只保留当前章施工卡和本章设定抽取包。
     </check>
 
     <check id="chapter_goal_clear">
@@ -275,6 +291,7 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
 
       <auto_validation_result>
         <source_pollution></source_pollution>
+        <single_chapter_card_only></single_chapter_card_only>
         <authority_boundary></authority_boundary>
         <concept_overload></concept_overload>
         <visible_consequence></visible_consequence>

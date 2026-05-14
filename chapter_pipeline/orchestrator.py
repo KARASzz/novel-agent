@@ -65,6 +65,8 @@ class ChapterPipelineInput:
     search_summary: str = ""
     chapter_index: int = 1
     model_slot: str = ""
+    chapter_construction_card: Dict[str, Any] = field(default_factory=dict)
+    chapter_setting_payload: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         return asdict(self)
@@ -234,6 +236,13 @@ class ChapterOrchestrator:
                     "model_slot": chapter_input.model_slot,
                 }
             )
+        if task.task_id in {"ceo_intake", "stage_1_2"}:
+            payload.update(
+                {
+                    "chapter_construction_card": chapter_input.chapter_construction_card,
+                    "chapter_setting_payload": chapter_input.chapter_setting_payload,
+                }
+            )
         if task.task_id.startswith("stage_6a_beats_"):
             payload["beat_group"] = task.task_id.removeprefix("stage_6a_beats_").replace("_", "/")
         if task.task_id.startswith("stage_6b_beats_"):
@@ -255,6 +264,8 @@ class ChapterOrchestrator:
         search_summary: str = "",
         chapter_index: int = 1,
         model_slot: str = "",
+        chapter_construction_card: Optional[Dict[str, Any]] = None,
+        chapter_setting_payload: Optional[Dict[str, Any]] = None,
     ) -> ChapterExecutionPlan:
         self.prompt_registry.validate_required_blocks()
         self._validate_single_chapter_scope(current_chapter)
@@ -267,6 +278,8 @@ class ChapterOrchestrator:
             search_summary=search_summary,
             chapter_index=chapter_index,
             model_slot=model_slot,
+            chapter_construction_card=chapter_construction_card or {},
+            chapter_setting_payload=chapter_setting_payload or {},
         )
 
         tasks: List[AgentTask] = [
@@ -392,6 +405,8 @@ class ChapterOrchestrator:
         )
         if not previous_chapter_script:
             ledger.human_decisions.append("缺少上一章第9步回写时，只允许使用最小临时假设。")
+        if not chapter_input.chapter_construction_card:
+            ledger.human_decisions.append("缺少章级施工卡时，只允许兼容旧链路，不得进入正式正文生产。")
 
         self._attach_task_inputs(tasks, chapter_input)
         plan = ChapterExecutionPlan(
@@ -414,6 +429,8 @@ class ChapterOrchestrator:
             search_summary=chapter_input.search_summary,
             chapter_index=chapter_input.chapter_index,
             model_slot=chapter_input.model_slot,
+            chapter_construction_card=chapter_input.chapter_construction_card,
+            chapter_setting_payload=chapter_input.chapter_setting_payload,
         )
 
     def _mock_task_output(self, task: AgentTask) -> Dict[str, object]:
@@ -615,6 +632,8 @@ class ChapterOrchestrator:
                 search_summary=search_summary,
                 chapter_index=start_index + offset,
                 model_slot=model_slot,
+                chapter_construction_card={},
+                chapter_setting_payload={},
             )
             output = self.run_mock_chapter(
                 project_goal=project_goal,
