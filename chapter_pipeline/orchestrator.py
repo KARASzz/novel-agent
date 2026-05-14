@@ -28,7 +28,8 @@ class ExecutionMode(str, Enum):
     PARALLEL = "parallel"
 
 
-SIX_B_ITERATION_ROUNDS = (
+# 默认章节迭代轮次（可由 bundle 或 model 动态调整）
+DEFAULT_SIX_B_ROUNDS = (
     "事件推进",
     "身体感受",
     "环境变化",
@@ -37,8 +38,8 @@ SIX_B_ITERATION_ROUNDS = (
     "去AI腔与句子口感",
 )
 
-
-BEAT_GROUPS = ((1, 2), (3, 4), (5, 6))
+# 默认节拍分组（可动态配置）
+DEFAULT_BEAT_GROUPS = ((1, 2), (3, 4), (5, 6))
 
 
 @dataclass
@@ -126,17 +127,15 @@ class ChapterExecutionPlan:
                 raise ValueError(f"Invalid 6A dependency: {draft_task_id}")
 
             previous_round_id = draft_task_id
-            for round_index in range(1, len(SIX_B_ITERATION_ROUNDS) + 1):
-                round_task_id = f"stage_6b_{group_id}_round_{round_index}"
-                round_task = tasks[round_task_id]
+            for round_task in [t for t in tasks.values() if t.task_id.startswith(f"stage_6b_{group_id}_")]:
                 if round_task.depends_on != [previous_round_id]:
-                    raise ValueError(f"Invalid 6B dependency: {round_task_id}")
-                previous_round_id = round_task_id
+                    raise ValueError(f"Invalid 6B dependency sequence: {round_task.task_id}")
+                previous_round_id = round_task.task_id
             previous_task = previous_round_id
 
         stage_7 = tasks["stage_7"]
-        if stage_7.depends_on != ["stage_6b_beats_5_6_round_6"]:
-            raise ValueError("Stage 7 must wait for the final 6B round.")
+        if not any(dep.startswith("stage_6b") for dep in stage_7.depends_on):
+            raise ValueError("Stage 7 must wait for at least one Stage 6B iteration.")
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -170,9 +169,10 @@ class ChapterOrchestrator:
     real production runner (calling LLM via ChapterPromptRegistry).
     """
 
-    def __init__(self, prompt_registry: Optional[ChapterPromptRegistry] = None, llm_client: Optional[Any] = None):
+    def __init__(self, prompt_registry: Optional[ChapterPromptRegistry] = None, llm_client: Optional[Any] = None, config: Optional[Dict[str, Any]] = None):
         self.prompt_registry = prompt_registry or ChapterPromptRegistry()
         self.llm_client = llm_client
+        self.config = config or {}
 
     @staticmethod
     def _stage_task(
@@ -317,8 +317,12 @@ class ChapterOrchestrator:
             ),
         ]
 
+        # 迭代轮次与节拍分组现在从配置或默认值获取
+        iteration_rounds = self.config.get("iteration_rounds", DEFAULT_SIX_B_ROUNDS)
+        beat_groups = self.config.get("beat_groups", DEFAULT_BEAT_GROUPS)
+
         previous_task = "stage_5"
-        for left, right in BEAT_GROUPS:
+        for left, right in beat_groups:
             group_id = f"beats_{left}_{right}"
             draft_task_id = f"stage_6a_{group_id}"
             tasks.append(
@@ -334,7 +338,7 @@ class ChapterOrchestrator:
             )
 
             previous_round_id = draft_task_id
-            for round_index, round_name in enumerate(SIX_B_ITERATION_ROUNDS, start=1):
+            for round_index, round_name in enumerate(iteration_rounds, start=1):
                 round_task_id = f"stage_6b_{group_id}_round_{round_index}"
                 tasks.append(
                     AgentTask(
@@ -414,7 +418,7 @@ class ChapterOrchestrator:
             chapter_input=chapter_input,
             tasks=tasks,
             prompt_blocks=list(self.prompt_registry.names()),
-            six_b_rounds=list(SIX_B_ITERATION_ROUNDS),
+            six_b_rounds=list(iteration_rounds),
         )
         plan.validate()
         return plan
@@ -434,42 +438,57 @@ class ChapterOrchestrator:
         )
 
     def _standard_task_output(self, task: AgentTask) -> Dict[str, object]:
-        if task.task_id.startswith("stage_6a_beats_"):
-            beat_group = str(task.input_payload.get("beat_group", ""))
-            return {
-                "summary": f"已生成第{beat_group}节拍正文草稿。",
-                "content": f"【第{beat_group}节拍正文草稿】围绕当前章目标推进冲突，保留章尾追读空间。",
-            }
-        if task.task_id.startswith("stage_6b_beats_"):
-            round_name = str(task.input_payload.get("iteration_round", ""))
-            return {
-                "summary": f"已完成单要素迭代：{round_name}。",
-                "content": f"【{round_name}迭代记录】只调整本轮要素，保留前序已定内容。",
-            }
-        return {
-            "summary": f"{task.title} 已按母版提示词完成 mock 产物。",
-            "content": f"【{task.task_id}】{task.title}",
-        }
+        """已弃用。生产环境必须使用 LLM 驱动。"""
+        raise RuntimeError(
+            f"[Production Violation] Task '{task.task_id}' 缺少有效的提示词配置，"
+            f"系统已禁止输出任何模板占位内容。请检查 ChapterPromptRegistry。"
+        )
+
+    @staticmethod
+    def _clean_content(text: str) -> str:
+        """解析 LLM 响应，移除 <think> 标签和 Markdown 围栏。"""
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+        fence = re.search(r"```(?:[a-z]*)?\s*([\s\S]*?)```", text)
+        if fence:
+            return fence.group(1).strip()
+        return text.strip()
 
     @staticmethod
     def _build_chapter_text(plan: ChapterExecutionPlan) -> str:
+        """拼接九步生产线第 6B 步的最终正文（Round 6 为最终迭代结果）。"""
         sections = [
             f"# {plan.chapter_input.current_chapter}",
             "",
-            "> mock 章节正文：真实模型接入后由第6A/6B产物替换。",
-            "",
         ]
-        for left, right in BEAT_GROUPS:
-            final_task_id = f"stage_6b_beats_{left}_{right}_round_6"
-            task = plan.task_map()[final_task_id]
-            sections.extend(
-                [
-                    f"## 节拍 {left}-{right}",
-                    str(task.output_payload.get("content", "")),
-                    "",
-                ]
-            )
-        sections.append("章尾钩子：更大的代价已经逼近，下一章必须立刻兑现或升级。")
+        # 动态获取当前计划中的节拍分组
+        beat_groups = []
+        for task_id in plan.task_map():
+            if task_id.startswith("stage_6a_beats_"):
+                m = re.search(r"beats_(\d+)_(\d+)", task_id)
+                if m:
+                    beat_groups.append((int(m.group(1)), int(m.group(2))))
+        beat_groups.sort()
+
+        for left, right in beat_groups:
+            # 找到该分组的最后一轮迭代任务
+            group_tasks = [t for tid, t in plan.task_map().items() if tid.startswith(f"stage_6b_beats_{left}_{right}_round_")]
+            if not group_tasks:
+                continue
+            
+            # 按 round_X 排序取最后一个
+            final_task = sorted(group_tasks, key=lambda x: int(x.task_id.split("_")[-1]))[-1]
+            if final_task.status == TaskStatus.COMPLETED:
+                content = ChapterOrchestrator._clean_content(str(final_task.output_payload.get("content", "")))
+                sections.append(content)
+                sections.append("")
+        
+        # 尝试从 stage_9 获取章尾钩子，若无则由后期润色补足
+        stage_9 = plan.task_map().get("stage_9")
+        if stage_9 and stage_9.status == TaskStatus.COMPLETED:
+            hook = stage_9.output_payload.get("hook_for_next_chapter")
+            if hook:
+                sections.append(f"【本章完：{hook}】")
+
         return "\n".join(sections).strip() + "\n"
 
     @staticmethod
@@ -495,8 +514,8 @@ class ChapterOrchestrator:
         )
         return {
             "chapter_scope_ok": not issues,
-            "six_b_serial_ok": not failed_stage_6_serial and len(stage_6b_tasks) == 18,
-            "beat_groups": [f"{left}-{right}" for left, right in BEAT_GROUPS],
+            "six_b_serial_ok": not failed_stage_6_serial,
+            "beat_groups": list(set(f"{m.group(1)}-{m.group(2)}" for m in [re.search(r"beats_(\d+)_(\d+)", t.task_id) for t in plan.tasks] if m)),
             "word_count_estimate": len(chapter_text),
             "checks": {
                 "current_chapter_only": True,
@@ -511,15 +530,23 @@ class ChapterOrchestrator:
 
     @staticmethod
     def _next_writeback(plan: ChapterExecutionPlan) -> Dict[str, object]:
+        """从 Stage 9 产物中提取真实的回写脚本，用于指导下一章生产。"""
+        stage_9 = plan.task_map().get("stage_9")
+        if stage_9 and stage_9.status == TaskStatus.COMPLETED:
+            payload = stage_9.output_payload
+            return {
+                "source_chapter_index": plan.chapter_input.chapter_index,
+                "source_chapter": plan.chapter_input.current_chapter,
+                "writeback_script": payload.get("content", "缺少 Stage 9 脚本响应"),
+                "status_summary": payload.get("summary", ""),
+                "next_chapter_setup": payload.get("next_chapter_setup", []),
+            }
+        
         return {
             "source_chapter_index": plan.chapter_input.chapter_index,
             "source_chapter": plan.chapter_input.current_chapter,
-            "carry_over": [
-                "保留主角当前情绪债。",
-                "下一章先承接章尾代价，再推进新冲突。",
-            ],
-            "unresolved_hooks": ["章尾出现的新代价需要在下一章开头回应。"],
-            "forbidden": ["不得跳过当前章后果直接进入远期大纲。"],
+            "carry_over": ["立项默认承诺：保持人物动机连贯"],
+            "warning": "缺少 Stage 9 回写，后续生产可能偏离轴心。",
         }
 
     def _write_output_files(
@@ -560,7 +587,7 @@ class ChapterOrchestrator:
         )
         return {name: str(path) for name, path in files.items()}
 
-    def run_production_chapter(
+    def run_chapter(
         self,
         project_goal: str,
         chapter_input: ChapterPipelineInput,
@@ -569,8 +596,9 @@ class ChapterOrchestrator:
         write_files: bool = True,
         verbose: bool = True,
     ) -> ChapterPipelineOutput:
+        """主执行流程：全面 LLM 驱动，无模板 fallback。"""
         if not self.llm_client:
-            raise RuntimeError("LLMClient is required for production run.")
+            raise RuntimeError("执行章节生产需要有效的 LLMClient 配置。")
 
         plan = self.build_plan_from_input(project_goal, chapter_input)
         completed: List[str] = []
@@ -587,7 +615,6 @@ class ChapterOrchestrator:
             
             task.status = TaskStatus.RUNNING
             
-            # 1. Build prompt
             prompt_block = None
             if task.prompt_block:
                 try:
@@ -596,13 +623,13 @@ class ChapterOrchestrator:
                     prompt_block = None
 
             if not prompt_block:
-                # If no prompt block, fallback to mock or error
+                # 只有验收任务可以特殊处理，其余必须由 LLM 完成
                 if task.task_id == "qa_acceptance_parallel":
-                     task.output_payload = {"summary": "Parallel QA check passed.", "status": "pass"}
+                     task.output_payload = {"summary": "并行 QA 验收已跳过（生产模式建议启用真实评审）。", "status": "pass"}
                 else:
                      task.output_payload = self._standard_task_output(task)
             else:
-                # 2. Call LLM
+                # 执行真实 LLM 调用
                 try:
                     res = self.llm_client.create_response(
                         model=model_id,
@@ -610,7 +637,21 @@ class ChapterOrchestrator:
                         input_text=json.dumps(task.input_payload, ensure_ascii=False),
                         temperature=0.7
                     )
-                    task.output_payload = {"content": res.output_text, "summary": f"Completed {task.title}"}
+                    content = res.output_text
+                    
+                    # 如果输出疑似 JSON，尝试解析摘要，否则原样保留正文
+                    summary = f"已完成 {task.title}"
+                    try:
+                        clean_json = self._clean_content(content)
+                        obj = json.loads(clean_json)
+                        if isinstance(obj, dict):
+                            task.output_payload = obj
+                            summary = obj.get("summary", summary)
+                        else:
+                            task.output_payload = {"content": content, "summary": summary}
+                    except Exception:
+                        task.output_payload = {"content": content, "summary": summary}
+
                 except Exception as e:
                     task.status = TaskStatus.FAILED
                     task.failure_reason = str(e)
@@ -629,7 +670,7 @@ class ChapterOrchestrator:
                 print(f"✅ [Orchestrator] Task {task.task_id} finished.", flush=True)
 
         plan.ledger.current_stage = "completed"
-        plan.ledger.next_step = "write next chapter from stage_9 writeback"
+        plan.ledger.next_step = "wait_for_next_batch"
 
         chapter_text = self._build_chapter_text(plan)
         stage_summaries = {
@@ -652,55 +693,7 @@ class ChapterOrchestrator:
             output.output_files = self._write_output_files(plan, output, output_root)
         return output
 
-    def run_standard_chapter(
-        self,
-        project_goal: str,
-        chapter_input: ChapterPipelineInput,
-        output_root: str | Path = "novel_outputs",
-        write_files: bool = True,
-    ) -> ChapterPipelineOutput:
-        plan = self.build_plan_from_input(project_goal, chapter_input)
-        completed: List[str] = []
-
-        for task in plan.tasks:
-            missing = [dep for dep in task.depends_on if dep not in completed]
-            if missing:
-                task.status = TaskStatus.FAILED
-                task.failure_reason = f"missing_dependencies:{','.join(missing)}"
-                raise RuntimeError(task.failure_reason)
-            task.status = TaskStatus.RUNNING
-            task.output_payload = self._standard_task_output(task)
-            task.status = TaskStatus.COMPLETED
-            task.final_decision = "standard_completed"
-            completed.append(task.task_id)
-            plan.ledger.completed.append(task.task_id)
-            if task.task_id in plan.ledger.pending:
-                plan.ledger.pending.remove(task.task_id)
-
-        plan.ledger.current_stage = "completed"
-        plan.ledger.next_step = "write next chapter from stage_9 writeback"
-
-        chapter_text = self._build_chapter_text(plan)
-        stage_summaries = {
-            task.task_id: str(task.output_payload.get("summary", ""))
-            for task in plan.tasks
-        }
-        quality_report = self._quality_report(plan, chapter_text)
-        next_writeback = self._next_writeback(plan)
-        output = ChapterPipelineOutput(
-            project_id=self._project_id(chapter_input.project_bundle),
-            chapter_index=chapter_input.chapter_index,
-            chapter_title=chapter_input.current_chapter,
-            chapter_text=chapter_text,
-            stage_summaries=stage_summaries,
-            fanqie_quality_report=quality_report,
-            next_chapter_writeback=next_writeback,
-        )
-        if write_files:
-            output.output_files = self._write_output_files(plan, output, output_root)
-        return output
-
-    def run_production_batch(
+    def run_batch(
         self,
         project_goal: str,
         chapter_titles: Sequence[str],
@@ -713,6 +706,7 @@ class ChapterOrchestrator:
         start_index: int = 1,
         write_files: bool = True,
     ) -> List[ChapterPipelineOutput]:
+        """批量生产章节。"""
         outputs: List[ChapterPipelineOutput] = []
         previous_writeback = initial_previous_writeback
         for offset, chapter_title in enumerate(chapter_titles):
@@ -723,49 +717,12 @@ class ChapterOrchestrator:
                 local_kb_reference=local_kb_reference,
                 search_summary=search_summary,
                 chapter_index=start_index + offset,
-                model_slot="production",
+                model_slot="batch_production",
             )
-            output = self.run_production_chapter(
+            output = self.run_chapter(
                 project_goal=project_goal,
                 chapter_input=chapter_input,
                 model_id=model_id,
-                output_root=output_root,
-                write_files=write_files,
-            )
-            outputs.append(output)
-            previous_writeback = json.dumps(output.next_chapter_writeback, ensure_ascii=False)
-        return outputs
-
-    def run_standard_batch(
-        self,
-        project_goal: str,
-        chapter_titles: Sequence[str],
-        project_bundle: Optional[Dict[str, Any]] = None,
-        initial_previous_writeback: str = "",
-        local_kb_reference: str = "",
-        search_summary: str = "",
-        output_root: str | Path = "novel_outputs",
-        model_slot: str = "",
-        start_index: int = 1,
-        write_files: bool = True,
-    ) -> List[ChapterPipelineOutput]:
-        outputs: List[ChapterPipelineOutput] = []
-        previous_writeback = initial_previous_writeback
-        for offset, chapter_title in enumerate(chapter_titles):
-            chapter_input = ChapterPipelineInput(
-                project_bundle=project_bundle or {},
-                current_chapter=chapter_title,
-                previous_chapter_writeback=previous_writeback,
-                local_kb_reference=local_kb_reference,
-                search_summary=search_summary,
-                chapter_index=start_index + offset,
-                model_slot=model_slot,
-                chapter_construction_card={},
-                chapter_setting_payload={},
-            )
-            output = self.run_standard_chapter(
-                project_goal=project_goal,
-                chapter_input=chapter_input,
                 output_root=output_root,
                 write_files=write_files,
             )

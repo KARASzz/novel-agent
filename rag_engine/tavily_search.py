@@ -21,7 +21,7 @@ class TavilySearcher:
         if not self.api_key:
             _safe_print("[Tavily] 未配置 API Key，网络检索功能已禁用。")
 
-    def search_hot_trends(self, query: str, max_results: int = 4) -> List[Dict]:
+    def search_hot_trends(self, query: str, max_results: int = 4, **kwargs) -> List[Dict]:
         """
         全量检索并爬取含有指定"题材关键词"的网页热议点。
         """
@@ -30,18 +30,24 @@ class TavilySearcher:
 
         try:
             _safe_print(f"[Tavily] 正在通过 MCP 扫描外网全域关于【{query}】的最新趋势与设定点...")
+            
+            tool_args = {
+                "query": f"番茄小说 网文 爆款 追读 分析 {query}",
+                "max_results": max_results,
+                "search_depth": "advanced",
+                "include_answer": True
+            }
+            # 合并额外参数
+            if kwargs:
+                tool_args.update(kwargs)
+
             raw_res = asyncio.run(
                 call_mcp_tool(
                     command="npx",
                     args=["-y", "mcp-remote", f"https://mcp.tavily.com/mcp/?tavilyApiKey={self.api_key}"],
                     env=os.environ.copy(),
                     tool_name="tavily_search",
-                    tool_args={
-                        "query": f"番茄小说 网文 爆款 追读 分析 {query}",
-                        "max_results": max_results,
-                        "search_depth": "advanced",
-                        "include_answer": True
-                    }
+                    tool_args=tool_args
                 )
             )
             

@@ -36,12 +36,15 @@ def _new_book_command(
     format_lane: str,
     author: str,
     no_rag: bool,
+    model_slot: Optional[str] = None,
     output: Optional[str] = None,
     save_bundle: Optional[str] = None,
 ) -> int:
     from scripts.preflight import main as run_preflight
 
     argv = [topic, "--format", format_lane, "--author", author]
+    if model_slot:
+        argv.extend(["--model-slot", model_slot])
     if no_rag:
         argv.append("--no-rag")
     if output:
@@ -63,6 +66,7 @@ def _full_flow_command(
         format_lane=format_lane,
         author=author,
         no_rag=no_rag,
+        model_slot=model_slot,
     )
     if exit_code != 0:
         print("❌ 前置立项未通过，终止后续大纲生成。")
@@ -102,30 +106,26 @@ def _next_chapter_command(
         model_slot=model_slot or "",
     )
 
-    if production:
-        if not model_slot:
-            print("❌ 生产模式必须指定 --model-slot")
-            return 1
-        try:
-            base_url, model_id, api_key = get_model_credentials(model_slot)
-            client = LLMClient(api_key=api_key, base_url=base_url)
-            orchestrator.llm_client = client
-            output = orchestrator.run_production_chapter(
-                project_goal="番茄小说章节生产",
-                chapter_input=chapter_input,
-                model_id=model_id,
-                output_root=output_root,
-            )
-        except Exception as e:
-            print(f"❌ 章节生产失败: {e}")
-            return 1
-    else:
-        output = orchestrator.run_standard_chapter(
+    if not model_slot:
+        print("❌ 章节生产必须指定 --model-slot（模板模式已废弃）")
+        return 1
+
+    try:
+        from scripts.outline_generator import get_model_credentials
+        from core_engine.llm_client import LLMClient
+        base_url, model_id, api_key = get_model_credentials(model_slot)
+        client = LLMClient(api_key=api_key, base_url=base_url)
+        orchestrator.llm_client = client
+        output = orchestrator.run_chapter(
             project_goal="番茄小说章节生产",
             chapter_input=chapter_input,
+            model_id=model_id,
             output_root=output_root,
         )
-    
+    except Exception as e:
+        print(f"❌ 章节生产失败: {e}")
+        return 1
+
     print(json.dumps(output.to_dict(), ensure_ascii=False, indent=2))
     return 0
 
@@ -253,6 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     new_book_parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
     new_book_parser.add_argument("--output", "-o", help="额外保存 Markdown 报告到指定路径")
     new_book_parser.add_argument("--save-bundle", help="保存 ContextBundle JSON 到指定目录或文件")
+    new_book_parser.add_argument("--model-slot", help="模型槽位，用于动态生成剧情钩子")
 
     full_flow_parser = subparsers.add_parser("full-flow", help="一键立项并全自动生成大纲与设定集")
     full_flow_parser.add_argument("topic", help="项目题材/关键词")
@@ -327,6 +328,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             format_lane=args.format,
             author=args.author,
             no_rag=args.no_rag,
+            model_slot=getattr(args, "model_slot", None),
             output=args.output,
             save_bundle=args.save_bundle,
         )

@@ -42,6 +42,34 @@ rag:
 
 # 前置决策中台配置
 pre_hub:
+  search:
+    enable_brave: true
+    enable_tavily: true
+    max_results_per_source: 6
+    brave:
+      search_lang: "zh"
+      country: "CN"
+      freshness: "py" # past year
+      extra_snippets: true
+    tavily:
+      search_depth: "advanced"
+      topic: "news"
+      include_answer: true
+      time_range: "month"
+  memory:
+    memory_subdirs:
+      - "knowledge_base/common"
+      - "knowledge_base/projects"
+      - "knowledge_base/memory"
+    anti_subdirs:
+      - "knowledge_base/anti"
+      - "knowledge_base/risk"
+      - "knowledge_base/failure"
+    memory_limit_chars: 6000
+    anti_limit_chars: 3000
+  packing:
+    max_sources_to_pack: 12
+    source_snippet_chars: 1200
   # Layer0: 信源净化
   source_guard:
     min_published_days: 90  # 禁止使用90天前的数据

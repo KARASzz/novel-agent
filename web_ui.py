@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -132,7 +133,7 @@ def _diff_note(previous_content: str, current_content: str, round_name: str) -> 
 
 
 def _orchestrator_status_payload() -> Dict[str, Any]:
-    from chapter_pipeline.orchestrator import BEAT_GROUPS, SIX_B_ITERATION_ROUNDS
+    from chapter_pipeline.orchestrator import DEFAULT_BEAT_GROUPS, DEFAULT_SIX_B_ROUNDS
 
     snapshot = _load_or_build_plan_snapshot()
     plan = snapshot["plan"]
@@ -168,14 +169,28 @@ def _orchestrator_status_payload() -> Dict[str, Any]:
             }
         )
 
+    # 动态获取节拍分组和迭代轮次
+    current_six_b_rounds = plan.get("six_b_rounds") or list(DEFAULT_SIX_B_ROUNDS)
+    
+    # 从任务中提取实际的节拍分组
+    actual_beat_groups = []
+    for task_id in task_map:
+        if task_id.startswith("stage_6a_beats_"):
+            m = re.search(r"beats_(\d+)_(\d+)", task_id)
+            if m:
+                actual_beat_groups.append((int(m.group(1)), int(m.group(2))))
+    actual_beat_groups.sort()
+    if not actual_beat_groups:
+        actual_beat_groups = list(DEFAULT_BEAT_GROUPS)
+
     stage6_groups = []
-    for left, right in BEAT_GROUPS:
+    for left, right in actual_beat_groups:
         group_id = f"beats_{left}_{right}"
         draft = task_map.get(f"stage_6a_{group_id}", {})
         draft_content = str(draft.get("content", ""))
         previous_content = draft_content
         rounds = []
-        for round_index, round_name in enumerate(SIX_B_ITERATION_ROUNDS, start=1):
+        for round_index, round_name in enumerate(current_six_b_rounds, start=1):
             task = task_map.get(f"stage_6b_{group_id}_round_{round_index}", {})
             content = str(task.get("content", ""))
             rounds.append(
@@ -216,7 +231,7 @@ def _orchestrator_status_payload() -> Dict[str, Any]:
         "agents": agents,
         "stage6": {
             "beat_groups": stage6_groups,
-            "six_b_rounds": list(SIX_B_ITERATION_ROUNDS),
+            "six_b_rounds": list(current_six_b_rounds),
         },
     }
 
@@ -459,39 +474,6 @@ async def open_generated_file(file_id: str):
         raise HTTPException(status_code=500, detail=f"系统默认打开命令执行失败: {exc}") from exc
 
 
-def _run_mock_chapter(selected_model_slot: str) -> str:
-    from chapter_pipeline import ChapterOrchestrator, ChapterPipelineInput
-
-    output = ChapterOrchestrator().run_mock_chapter(
-        project_goal="番茄小说章节生产",
-        chapter_input=ChapterPipelineInput(
-            project_bundle={"project_id": "console_demo", "project_title": "控制台试运行"},
-            current_chapter="第一章：控制台试运行",
-            previous_chapter_writeback="新书开局，无上一章回写。",
-            local_kb_reference="控制台 mock：使用本地知识库摘要占位。",
-            search_summary="控制台 mock：联网搜索摘要占位。",
-            chapter_index=1,
-            model_slot=selected_model_slot,
-        ),
-        output_root=Path(BASE_DIR) / "novel_outputs",
-    )
-    return "已生成 mock 下一章。\n" + json.dumps(output.to_dict(), ensure_ascii=False, indent=2)
-
-
-def _run_mock_batch(selected_model_slot: str) -> str:
-    from chapter_pipeline import ChapterOrchestrator
-
-    outputs = ChapterOrchestrator().run_mock_batch(
-        project_goal="番茄小说章节生产",
-        chapter_titles=["第一章：控制台试运行", "第二章：回写承接测试"],
-        project_bundle={"project_id": "console_demo", "project_title": "控制台试运行"},
-        initial_previous_writeback="新书开局，无上一章回写。",
-        local_kb_reference="控制台 mock：使用本地知识库摘要占位。",
-        search_summary="控制台 mock：联网搜索摘要占位。",
-        output_root=Path(BASE_DIR) / "novel_outputs",
-        model_slot=selected_model_slot,
-    )
-    return "已批量生成 mock 章节。\n" + json.dumps([item.to_dict() for item in outputs], ensure_ascii=False, indent=2)
 
 
 def _search_diag() -> str:
@@ -526,7 +508,7 @@ async def run_command(command: str, request: Request):
     py = "python3"
     # Map API commands to actual python CLI commands
     cmd_map = {
-        "preflight": [py, "-m", "scripts.cli", "new-book", topic, "--format", "real"],
+        "preflight": [py, "-m", "scripts.cli", "new-book", topic, "--format", "real", "--model-slot", selected_model_slot],
         "feed": [py, "-m", "core_engine.update_kb", topic],
         "export_fanqie": [py, "-m", "scripts.cli", "export-fanqie", "--name", "demo_project", "--genre", "番茄小说", "--author", "none"],
         "full_flow": [py, "-m", "scripts.cli", "full-flow", topic, "--format", "real", "--model-slot", selected_model_slot],
@@ -563,15 +545,21 @@ async def run_command(command: str, request: Request):
 
     cmd = list(cmd_map[command])
     
+    import subprocess
     # Use StreamingResponse for shell commands to show real-time progress
     async def process_stream():
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 cwd=BASE_DIR,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT
             )
+            
+            if process.stdout is None:
+                yield "错误: 子进程未能建立 stdout 管道。\n"
+                return
+                
             while True:
                 chunk = await process.stdout.read(1024)
                 if not chunk:

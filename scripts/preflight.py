@@ -116,6 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
     parser.add_argument("--output", "-o", type=str, help="额外保存 Markdown 报告到指定路径")
     parser.add_argument("--save-bundle", type=str, help="保存 ChapterProductionBundle JSON 到指定目录或文件")
+    parser.add_argument("--model-slot", type=str, help="模型槽位，用于调用大模型生成动态预设")
     return parser
 
 
@@ -136,6 +137,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         format_lane=format_lane,
         author_id=args.author,
         use_rag=not args.no_rag,
+        model_slot=args.model_slot,
     )
 
     passport = bundle.preflight_passport

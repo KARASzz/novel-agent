@@ -15,11 +15,15 @@ class SearchAggregator:
         enable_brave: bool = True,
         enable_tavily: bool = True,
         enable_local: bool = True,
+        brave_params: Optional[Dict[str, Any]] = None,
+        tavily_params: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.local_kb_dir = local_kb_dir
         self.enable_brave = enable_brave
         self.enable_tavily = enable_tavily
         self.enable_local = enable_local
+        self.brave_params = brave_params or {}
+        self.tavily_params = tavily_params or {}
         self.fallback_reasons: List[str] = []
 
     @staticmethod
@@ -66,7 +70,11 @@ class SearchAggregator:
         try:
             from rag_engine.brave_search import BraveSearcher
             print(f"DEBUG: Starting Brave Search for query: {query}")
-            results = BraveSearcher(api_key=api_key).search_hot_trends(query, max_results=max_results)
+            results = BraveSearcher(api_key=api_key).search_hot_trends(
+                query, 
+                max_results=max_results,
+                **self.brave_params
+            )
             print(f"DEBUG: Brave Search completed, found {len(results)} results")
             return results
         except Exception as exc:
@@ -87,7 +95,11 @@ class SearchAggregator:
         try:
             from rag_engine.tavily_search import TavilySearcher
             print(f"DEBUG: Starting Tavily Search for query: {query}")
-            results = TavilySearcher(api_key=api_key).search_hot_trends(query, max_results=max_results)
+            results = TavilySearcher(api_key=api_key).search_hot_trends(
+                query, 
+                max_results=max_results,
+                **self.tavily_params
+            )
             print(f"DEBUG: Tavily Search completed, found {len(results)} results")
             return results
         except Exception as exc:

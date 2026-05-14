@@ -18,7 +18,7 @@ class BraveSearcher:
         if not self.api_key:
             _safe_print("[Brave] 未配置 API Key，Brave 搜索功能已禁用。")
 
-    def search_hot_trends(self, query: str, max_results: int = 4) -> List[Dict]:
+    def search_hot_trends(self, query: str, max_results: int = 4, **kwargs) -> List[Dict]:
         if not self.api_key:
             return []
 
@@ -27,16 +27,21 @@ class BraveSearcher:
             env = os.environ.copy()
             env["BRAVE_API_KEY"] = self.api_key
             
+            tool_args = {
+                "query": f"番茄小说 网文 爆款 趋势 {query}",
+                "count": max(1, min(int(max_results), 20))
+            }
+            # 合并额外参数
+            if kwargs:
+                tool_args.update(kwargs)
+
             raw_res = asyncio.run(
                 call_mcp_tool(
                     command="npx",
                     args=["-y", "@brave/brave-search-mcp-server"],
                     env=env,
                     tool_name="brave_llm_context",
-                    tool_args={
-                        "query": f"番茄小说 网文 爆款 趋势 {query}",
-                        "count": max(1, min(int(max_results), 20))
-                    }
+                    tool_args=tool_args
                 )
             )
             
