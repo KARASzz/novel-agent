@@ -25,7 +25,7 @@ def verify() -> int:
         print(f"INDEX_ID: {os.environ.get('BAILIAN_INDEX_ID', 'NO')}")
         return 1
 
-    query = "短剧的商业钩子怎么写？"
+    query = "番茄小说的追读钩子怎么写？"
     print(f"\nQuerying: {query}")
     context = retriever.get_rag_context(query)
     if not context:

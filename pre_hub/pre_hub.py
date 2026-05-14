@@ -33,16 +33,18 @@ from pre_hub.schemas.pre_hub_models import (
     RouteDecisionPack,
     SourceConfidenceItem,
     SourceTier,
+    TargetPlatform,
     TrendDirection,
+    ViewingMode,
     VisualCore,
     utc_now,
 )
 
 
 LANE_KEYWORDS = {
-    ContentLane.STABLE_HIT: ["逆袭", "复仇", "打脸", "霸总", "真假千金", "赘婿", "女强"],
-    ContentLane.RISING_MIX: ["穿越", "重生", "系统", "玄幻", "奇幻", "异能", "AI"],
-    ContentLane.INNOVATION_PREMIUM: ["悬疑", "现实", "民国", "职场", "家庭", "求真", "精品"],
+    ContentLane.STABLE_HIT: ["逆袭", "复仇", "打脸", "升级", "爽文", "女强", "权谋", "都市"],
+    ContentLane.RISING_MIX: ["穿越", "重生", "系统", "玄幻", "奇幻", "异能", "修仙", "末世"],
+    ContentLane.INNOVATION_PREMIUM: ["悬疑", "现实", "民国", "职场", "家庭", "求真", "群像", "精品"],
 }
 
 RISK_KEYWORDS = {
@@ -53,11 +55,11 @@ RISK_KEYWORDS = {
 
 
 class PreHubOrchestrator:
-    """Pre-Hub V4 decision orchestrator.
+    """Novel Preflight decision orchestrator.
 
-    The workflow is M00-M09 plus MX1. It prefers live sources when credentials
-    exist, degrades to local knowledge with explicit fallback metadata, and
-    returns a sealed ContextBundle for the existing parser pipeline.
+    The workflow keeps the old M00-M09 shape, but the scoring surface is now
+    for Fanqie-style serialized novels: reader promise, chapter hooks, setting
+    sustainability, continuity, and compliance. Cloud LTM is frozen by default.
     """
 
     def __init__(
@@ -71,8 +73,15 @@ class PreHubOrchestrator:
         self.workspace_root = workspace_root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.run_id = uuid.uuid4().hex[:10]
         self.fallback_reasons: List[str] = []
-        self.ltm_client = ltm_client or LTMClient()
-        self.ltm_governance = ltm_governance or LTMGovernance(self.workspace_root, client=self.ltm_client)
+        ltm_cfg = self.config.get("pre_hub", {}).get("ltm", {})
+        self.enable_ltm_shadow_write = bool(ltm_cfg.get("enable_shadow_write", False))
+        self.ltm_client = ltm_client
+        if ltm_governance is not None:
+            self.ltm_governance = ltm_governance
+        elif self.enable_ltm_shadow_write:
+            self.ltm_governance = LTMGovernance(self.workspace_root, client=ltm_client or LTMClient())
+        else:
+            self.ltm_governance = None
 
     def run(
         self,
@@ -81,22 +90,22 @@ class PreHubOrchestrator:
         author_id: str = "default",
         use_rag: bool = True,
     ) -> ContextBundleForParser:
-        print(f"[PreHub V4] M00 start: topic={topic}, format={format_lane.value}")
+        print(f"[Novel Preflight] M00 start: topic={topic}, chapter_form={format_lane.label}")
         capsule = self._m00_intake(topic, format_lane, author_id)
 
         raw_sources = self._collect_sources(topic, use_rag=use_rag)
         cleaned_sources, source_map, risk_signals = self._m01_source_guard(raw_sources)
-        print(f"[PreHub V4] M01 sources: raw={len(raw_sources)} clean={len(cleaned_sources)}")
+        print(f"[Novel Preflight] M01 sources: raw={len(raw_sources)} clean={len(cleaned_sources)}")
 
         market = self._m02_market_radar(capsule, cleaned_sources, source_map, risk_signals)
-        print(f"[PreHub V4] M02 market fallback={len(market.fallback_reasons)}")
+        print(f"[Novel Preflight] M02 market fallback={len(market.fallback_reasons)}")
 
         author_memory = self._m03_author_memory(capsule, topic, use_rag=use_rag)
-        print(f"[PreHub V4] M03 author memory items={len(author_memory.reusable_pattern_pack)}")
+        print(f"[Novel Preflight] M03 local memory items={len(author_memory.reusable_pattern_pack)}")
 
         audience = self._m04_audience_model(capsule, market, author_memory)
         route = self._m05_route(capsule, market, author_memory, audience)
-        print(f"[PreHub V4] M05 route: {route.content_lane.value}/{route.format_lane.value}")
+        print(f"[Novel Preflight] M05 route: {route.content_lane.value}/{route.format_lane.label}")
 
         branches = self._m06_concept_arena(capsule, market, author_memory, route)
         narrative = self._m07_narrative_seed(capsule, route, branches)
@@ -121,8 +130,9 @@ class PreHubOrchestrator:
             fallback_reasons=sorted(set(self.fallback_reasons)),
         ).seal()
 
-        self._mx1_stage_memory_candidate(bundle)
-        print(f"[PreHub V4] M09 passport: pass={passport.is_pass} score={passport.total_score}")
+        if self.enable_ltm_shadow_write:
+            self._mx1_stage_memory_candidate(bundle)
+        print(f"[Novel Preflight] M09 passport: pass={passport.is_pass} score={passport.total_score}")
         return bundle
 
     def _m00_intake(self, topic: str, format_lane: FormatLane, author_id: str) -> ProjectCapsule:
@@ -145,13 +155,14 @@ class PreHubOrchestrator:
             project_id=project_id,
             author_id=author_id,
             project_title=topic.strip(),
-            one_line_premise=f"{topic.strip()}项目，以{emotion.value}为情绪核心，面向红果短剧准入评审。",
+            one_line_premise=f"{topic.strip()}项目，以{emotion.value}为情绪核心，面向番茄小说连载立项评审。",
             theme_tags=tags,
             emotion_core=emotion,
             visual_core=visual,
+            target_platform=TargetPlatform.FANQIE_NOVEL,
             preferred_format=format_lane,
-            hard_constraints=["不得使用未授权 IP 或肖像素材", "前三集必须有清晰钩子与情绪债"],
-            soft_goals=["降低同质化风险", "保留系列化空间"],
+            hard_constraints=["不得抄袭或套用未授权 IP", "前三章必须建立读者承诺与追读钩子"],
+            soft_goals=["降低同质化风险", "保证设定可持续连载", "保留章节回写空间"],
         )
 
     def _collect_sources(self, topic: str, use_rag: bool) -> List[Dict[str, Any]]:
@@ -159,31 +170,29 @@ class PreHubOrchestrator:
             self.fallback_reasons.append("rag_disabled_by_cli")
             return self._local_knowledge_sources(topic, reason="rag_disabled_by_cli")
 
-        if not os.getenv("TAVILY_API_KEY"):
-            self.fallback_reasons.append("missing_env:TAVILY_API_KEY")
-            return self._local_knowledge_sources(topic, reason="missing_env:TAVILY_API_KEY")
-
         try:
-            from rag_engine.tavily_search import TavilySearcher
+            from rag_engine.search_aggregator import SearchAggregator
 
-            searcher = TavilySearcher()
-            results = searcher.search_hot_trends(topic, max_results=8)
+            kb_dir = os.path.join(self.workspace_root, "knowledge_base")
+            aggregated = SearchAggregator(local_kb_dir=kb_dir).search(topic, max_results_per_source=6)
+            self.fallback_reasons.extend(aggregated.get("fallback_reasons", []))
+            results = aggregated.get("results", [])
             if results:
                 return [
                     {
                         "title": item.get("title", ""),
                         "content": item.get("content", ""),
                         "url": item.get("url", ""),
-                        "source": item.get("source") or item.get("url", "tavily"),
+                        "source": item.get("source") or item.get("origin") or "search_aggregator",
                         "published_at": item.get("published_at") or item.get("date") or datetime.now().strftime("%Y-%m-%d"),
-                        "origin": "tavily",
+                        "origin": item.get("origin", "search_aggregator"),
                     }
                     for item in results
                 ]
-            self.fallback_reasons.append("tavily_empty_result")
+            self.fallback_reasons.append("search_aggregator_empty_result")
         except Exception as exc:
-            self.fallback_reasons.append(f"tavily_failed:{type(exc).__name__}")
-        return self._local_knowledge_sources(topic, reason="tavily_fallback")
+            self.fallback_reasons.append(f"search_aggregator_failed:{type(exc).__name__}")
+        return self._local_knowledge_sources(topic, reason="search_fallback")
 
     def _local_knowledge_sources(self, topic: str, reason: str) -> List[Dict[str, Any]]:
         kb_dir = os.path.join(self.workspace_root, "knowledge_base")
@@ -191,7 +200,7 @@ class PreHubOrchestrator:
             return [
                 {
                     "title": f"{topic} 本地规则兜底",
-                    "content": f"{topic} 缺少外部数据，按短剧基础规则评审：前三集钩子、反转、付费点、合规风险。",
+                    "content": f"{topic} 缺少外部数据，按番茄小说基础规则评审：前三章读者承诺、追读钩子、爽点外化、设定可持续性、合规风险。",
                     "url": "local://fallback",
                     "source": "local_rules",
                     "published_at": datetime.now().strftime("%Y-%m-%d"),
@@ -230,6 +239,17 @@ class PreHubOrchestrator:
                     "url": f"local://{os.path.relpath(path, self.workspace_root).replace(os.sep, '/')}",
                     "source": "local_knowledge_base",
                     "published_at": mtime,
+                    "origin": reason,
+                }
+            )
+        if not sources:
+            sources.append(
+                {
+                    "title": f"{topic} 番茄小说本地兜底",
+                    "content": f"{topic} 按番茄小说基础规则评审：题材承诺、主角驱动力、前三章追读、章尾钩子、长线设定可持续性。",
+                    "url": "local://fallback",
+                    "source": "local_knowledge_base",
+                    "published_at": datetime.now().strftime("%Y-%m-%d"),
                     "origin": reason,
                 }
             )
@@ -343,7 +363,7 @@ class PreHubOrchestrator:
         risk_heat = self._risk_heatmap(risk_signals)
         opportunity = [
             HeatmapItem(
-                label=f"{lane_heatmap[0].label}差异化窗口" if lane_heatmap else "基础短剧窗口",
+                label=f"{lane_heatmap[0].label}差异化窗口" if lane_heatmap else "基础网文窗口",
                 score=max(45, min(88, (lane_heatmap[0].score if lane_heatmap else 50) - 5)),
                 trend=TrendDirection.UP,
                 confidence=avg_conf,
@@ -357,7 +377,7 @@ class PreHubOrchestrator:
             project_id=capsule.project_id,
             as_of_date=datetime.now().strftime("%Y-%m-%d"),
             platform_state_snapshot={
-                "platform": "redfruit",
+                "platform": "fanqie_novel",
                 "source_count": len(sources),
                 "clean_source_count": len(source_map),
                 "avg_source_confidence": round(avg_conf, 3),
@@ -369,8 +389,8 @@ class PreHubOrchestrator:
             source_confidence_map=source_map,
             metric_normalization_note={
                 "DAU_vs_MAU": "日活/月活不可混用",
-                "views_vs_viewers": "观看量/观看人次不可混用",
-                "heat_vs_revenue": "热度值/分账额不可直接等价",
+                "reads_vs_readers": "阅读量/阅读人数不可混用",
+                "heat_vs_retention": "热度值/完读率/追读率不可直接等价",
             },
             fallback_reasons=fallback,
         )
@@ -378,31 +398,28 @@ class PreHubOrchestrator:
     def _m03_author_memory(
         self, capsule: ProjectCapsule, topic: str, use_rag: bool
     ) -> AuthorMemoryPack:
-        query = f"{topic} {capsule.emotion_core.value} {capsule.preferred_format.value} 短剧 钩子 失败模式"
+        query = f"{topic} {capsule.emotion_core.value} 番茄小说 追读钩子 爽点密度 失败模式"
         nodes: List[Dict[str, Any]] = []
-        meta: Dict[str, Any] = {"source": "disabled", "query": query, "top_k_raw": 5, "top_k_final": 0}
-        fallback: List[str] = []
+        meta: Dict[str, Any] = {
+            "source": "local_project_knowledge",
+            "query": query,
+            "top_k_raw": 5,
+            "top_k_final": 0,
+        }
+        fallback: List[str] = ["cloud_ltm_frozen"]
 
-        if use_rag:
-            nodes, meta = self.ltm_client.search_memory(capsule.author_id, query, top_k=5, min_score=0.0)
-            if meta.get("fallback_reason"):
-                fallback.append(str(meta["fallback_reason"]))
-        else:
-            fallback.append("ltm_disabled_by_no_rag")
-
-        if not nodes:
-            shadow_candidates = self.ltm_governance.shadow.candidates()
-            nodes = [
-                {
-                    "memory_node_id": item.candidate_id,
-                    "content": item.to_custom_content(),
-                    "score": item.candidate_confidence,
-                    "source": "local_shadow",
-                }
-                for item in shadow_candidates[-5:]
-            ]
-            if nodes:
-                fallback.append("ltm_shadow_recall")
+        local_sources = self._local_knowledge_sources(topic, reason="local_project_memory")
+        nodes = [
+            {
+                "memory_node_id": source.get("url") or f"local_{idx}",
+                "content": source.get("content", ""),
+                "score": 0.62,
+                "source": "local_project_knowledge",
+                "title": source.get("title", ""),
+            }
+            for idx, source in enumerate(local_sources[:5], start=1)
+        ]
+        meta["top_k_final"] = len(nodes)
 
         reusable = []
         anti = []
@@ -412,7 +429,7 @@ class PreHubOrchestrator:
                 "memory_node_id": node.get("memory_node_id"),
                 "content": content,
                 "score": node.get("score"),
-                "source": node.get("source", meta.get("source", "cloud_ltm")),
+                "source": node.get("source", meta.get("source", "local_project_knowledge")),
             }
             if any(k in content.lower() for k in ["failure", "失败", "避免", "风险", "anti"]):
                 anti.append(item)
@@ -423,16 +440,16 @@ class PreHubOrchestrator:
         return AuthorMemoryPack(
             pack_id=f"mem_{capsule.project_id}",
             author_id=capsule.author_id,
-            ltm_snapshot_id=f"ltm_{uuid.uuid4().hex[:8]}",
-            profile_version=os.getenv("LTM_PROFILE_SCHEMA_ID", "local_or_default"),
-            strongest_lanes=lanes or [capsule.theme_tags[0] if capsule.theme_tags else "短剧"],
-            weakest_lanes=["高概念过载", "缺少证据的伪创新"],
+            ltm_snapshot_id="cloud_ltm_frozen",
+            profile_version="local_project_knowledge",
+            strongest_lanes=lanes or [capsule.theme_tags[0] if capsule.theme_tags else "网文"],
+            weakest_lanes=["高概念过载", "缺少追读钩子的伪创新"],
             reusable_pattern_pack=reusable,
             anti_pattern_blacklist=anti,
             author_bias_report=[
                 {
                     "bias_name": "新鲜度高估",
-                    "description": "如缺少真实市场证据，默认降低创新方案置信度。",
+                    "description": "如缺少真实读者反馈或可追溯平台证据，默认降低创新方案置信度。",
                     "impact_level": RiskLevel.MEDIUM.value,
                 }
             ],
@@ -447,8 +464,8 @@ class PreHubOrchestrator:
         author_memory: AuthorMemoryPack,
     ) -> AudiencePriorMatrix:
         top_score = market.lane_heatmap[0].score if market.lane_heatmap else 50
-        ltm_penalty = 0.08 if author_memory.anti_pattern_blacklist else 0.0
-        integratable = max(0.2, min(0.45, top_score / 250 - ltm_penalty))
+        memory_penalty = 0.08 if author_memory.anti_pattern_blacklist else 0.0
+        integratable = max(0.2, min(0.45, top_score / 250 - memory_penalty))
         fatigued = max(0.12, min(0.35, 0.32 - integratable / 3))
         high_sensitive = max(0.2, min(0.4, 0.28 + top_score / 500))
         immune = max(0.05, 1.0 - integratable - fatigued - high_sensitive - 0.08)
@@ -461,13 +478,13 @@ class PreHubOrchestrator:
                 "过载区": 0.08,
             },
             viewing_mode_scores={
-                "真人情绪型": 0.82 if capsule.preferred_format == FormatLane.REAL else 0.58,
-                "真人关系型": 0.76 if capsule.visual_core == VisualCore.REAL_RELATION else 0.52,
-                "AI奇观型": 0.78 if capsule.preferred_format == FormatLane.AI else 0.42,
-                "系列成瘾型": 0.68,
-                "单部爆发型": 0.55,
+                ViewingMode.REAL_EMOTION.value: 0.82 if capsule.preferred_format == FormatLane.REAL else 0.58,
+                ViewingMode.REAL_RELATION.value: 0.76 if capsule.visual_core == VisualCore.REAL_RELATION else 0.52,
+                ViewingMode.AI_SPEC.value: 0.78 if capsule.preferred_format == FormatLane.AI else 0.42,
+                ViewingMode.SERIES_ADDICT.value: 0.68,
+                ViewingMode.SINGLE_BURST.value: 0.55,
             },
-            integration_threshold=round(0.62 + ltm_penalty, 3),
+            integration_threshold=round(0.62 + memory_penalty, 3),
         )
 
     def _m05_route(
@@ -486,17 +503,17 @@ class PreHubOrchestrator:
                 market_fit = lane_scores.get(lane.value, 45)
                 format_fit = format_scores.get(fmt, 55)
                 novelty = 78 if lane == ContentLane.INNOVATION_PREMIUM else 62 if lane == ContentLane.RISING_MIX else 55
-                producibility = 82 if fmt == FormatLane.REAL else 62 if fmt == FormatLane.MIXED else 54
+                chapter_production = 82 if fmt == FormatLane.REAL else 68 if fmt == FormatLane.MIXED else 60
                 compliance = 82 if lane != ContentLane.RISING_MIX else 68
-                ltm_match = 70 + min(len(author_memory.reusable_pattern_pack) * 4, 12)
+                project_memory_match = 70 + min(len(author_memory.reusable_pattern_pack) * 4, 12)
                 preferred_bonus = 8 if fmt == preferred else 0
                 total = int(
                     0.24 * market_fit
                     + 0.18 * format_fit
                     + 0.15 * novelty
-                    + 0.18 * producibility
+                    + 0.18 * chapter_production
                     + 0.15 * compliance
-                    + 0.10 * ltm_match
+                    + 0.10 * project_memory_match
                     + preferred_bonus
                 )
                 matrix.append(
@@ -505,11 +522,11 @@ class PreHubOrchestrator:
                         "content_lane": lane.value,
                         "format_lane": fmt.value,
                         "market_fit_score": market_fit,
-                        "audience_fit_score": int(audience.viewing_mode_scores.get("真人情绪型", 0.6) * 100),
+                        "audience_fit_score": int(audience.viewing_mode_scores.get(ViewingMode.REAL_EMOTION.value, 0.6) * 100),
                         "novelty_score": novelty,
-                        "producibility_score": producibility,
+                        "chapter_production_score": chapter_production,
                         "compliance_score": compliance,
-                        "ltm_match_score": ltm_match,
+                        "project_memory_match_score": project_memory_match,
                         "total_score": max(0, min(100, total)),
                     }
                 )
@@ -527,14 +544,14 @@ class PreHubOrchestrator:
             format_lane=format_lane,
             route_matrix_scorecard=matrix,
             decision_rationale=(
-                f"综合市场证据、制作形态和作者记忆，当前最优路线为"
-                f"{content_lane.value}/{format_lane.value}，评分{winner['total_score']}。"
+                f"综合市场证据、章节形态和本地项目知识，当前最优路线为"
+                f"{content_lane.value}/{format_lane.label}，评分{winner['total_score']}。"
             ),
             route_confidence=round(winner["total_score"] / 100, 3),
             forbidden_cliche_list=forbidden,
             production_burden_estimate={
-                "level": "medium" if winner["producibility_score"] >= 65 else "high",
-                "reason": "根据制作形态、合规压力和题材复杂度估算。",
+                "level": "medium" if winner["chapter_production_score"] >= 65 else "high",
+                "reason": "根据章节形态、连载复杂度、合规压力和题材可持续性估算。",
             },
         )
 
@@ -546,7 +563,7 @@ class PreHubOrchestrator:
         route: RouteDecisionPack,
     ) -> List[BranchScore]:
         top_market = market.lane_heatmap[0].score if market.lane_heatmap else 55
-        ltm_boost = min(10, len(author_memory.reusable_pattern_pack) * 3)
+        project_memory_boost = min(10, len(author_memory.reusable_pattern_pack) * 3)
         branch_specs = [
             ("A", "强冲突逆袭线", 82, 78, 72, 84, 22),
             ("B", "高概念反差线", 75, 88, 82, 62, 38),
@@ -565,7 +582,7 @@ class PreHubOrchestrator:
                 + 0.15 * ip
                 + 0.20 * producibility
                 + 0.10 * (100 - rights)
-                + 0.05 * (70 + ltm_boost)
+                + 0.05 * (70 + project_memory_boost)
             )
             branches.append(
                 BranchScore(
@@ -576,7 +593,7 @@ class PreHubOrchestrator:
                     ip_potential=min(100, ip),
                     producibility=min(100, producibility),
                     rights_risk=rights,
-                    ltm_match=70 + ltm_boost,
+                    ltm_match=70 + project_memory_boost,
                     total_score=max(0, min(100, total)),
                     evidence_refs=market.lane_heatmap[0].evidence_refs if market.lane_heatmap else [],
                 )
@@ -595,17 +612,17 @@ class PreHubOrchestrator:
         winner = branches[0] if branches else None
         runner_up = branches[1] if len(branches) > 1 else None
         graph = [
-            NarrativeGraphNode(node_id="motive", node_type="character", content="主角被压迫或误判，建立情绪债", episode_range="1"),
-            NarrativeGraphNode(node_id="hook_ep1", node_type="hook", content="第一集结尾给出可视化代价与反击承诺", episode_range="1", dependencies=["motive"]),
-            NarrativeGraphNode(node_id="turn_ep3", node_type="plot_point", content="第三集完成第一次身份/关系反转", episode_range="2-3", dependencies=["hook_ep1"]),
-            NarrativeGraphNode(node_id="paywall", node_type="cliffhanger", content="付费点前制造更大羞辱或损失", episode_range="5-7", dependencies=["turn_ep3"]),
-            NarrativeGraphNode(node_id="series_hook", node_type="cliffhanger", content="中后段打开系列化敌人或更大真相", episode_range="10-20", dependencies=["paywall"]),
+            NarrativeGraphNode(node_id="motive", node_type="character", content="主角被压迫或误判，建立情绪债与明确欲望", episode_range="第1章"),
+            NarrativeGraphNode(node_id="hook_ch1", node_type="hook", content="第一章末给出读者承诺、现实代价与反击方向", episode_range="第1章", dependencies=["motive"]),
+            NarrativeGraphNode(node_id="turn_ch3", node_type="plot_point", content="第三章完成第一次身份/关系/目标反转，形成追读理由", episode_range="第2-3章", dependencies=["hook_ch1"]),
+            NarrativeGraphNode(node_id="retention_ch6", node_type="cliffhanger", content="第六章前把损失、羞辱或机会推到更高台阶，锁定书架与追读", episode_range="第4-6章", dependencies=["turn_ch3"]),
+            NarrativeGraphNode(node_id="series_hook", node_type="cliffhanger", content="中后段打开系列化敌人、阶层天花板或更大真相", episode_range="第10-20章", dependencies=["retention_ch6"]),
         ]
         hooks = [
             HookNode(episode_no=1, hook_type="冲突升级型", hook_text="当场受辱，给出反击承诺", intensity=78, emotional_debt_raised=70),
             HookNode(episode_no=3, hook_type="反转型", hook_text="关键身份/关系误判翻转", intensity=82, emotional_debt_raised=65, emotional_debt_repaid=35),
-            HookNode(episode_no=6, hook_type="情绪临界型", hook_text="付费前把代价推到最大", intensity=90, emotional_debt_raised=85),
-            HookNode(episode_no=12, hook_type="悬念型", hook_text="揭示更大幕后目标", intensity=84, emotional_debt_raised=50, emotional_debt_repaid=40),
+            HookNode(episode_no=6, hook_type="追读锁定型", hook_text="把代价、机会或敌人压迫推到更高台阶", intensity=90, emotional_debt_raised=85),
+            HookNode(episode_no=12, hook_type="长线悬念型", hook_text="揭示更大幕后目标或下一阶段成长天花板", intensity=84, emotional_debt_raised=50, emotional_debt_repaid=40),
         ]
         return NarrativeSeedPack(
             pack_id=f"seed_{capsule.project_id}",
@@ -614,19 +631,20 @@ class PreHubOrchestrator:
             runner_up_branch=runner_up,
             narrative_graph_v1=graph,
             knowledge_state_map=[
-                {"episode_no": 1, "actor": "主角", "knows": ["真实目标"], "misbeliefs": [], "audience_knows_more": False},
-                {"episode_no": 3, "actor": "反派", "knows": ["表层身份"], "misbeliefs": ["主角无反击能力"], "audience_knows_more": True},
+                {"chapter_no": 1, "actor": "主角", "knows": ["真实目标"], "misbeliefs": [], "audience_knows_more": False},
+                {"chapter_no": 3, "actor": "反派", "knows": ["表层身份"], "misbeliefs": ["主角无反击能力"], "audience_knows_more": True},
             ],
             emotional_debt_ledger=[
-                {"episode_no": 1, "debt_open": 70, "debt_close": 0, "repay_ratio": 0.0},
-                {"episode_no": 3, "debt_open": 65, "debt_close": 35, "repay_ratio": 0.54},
-                {"episode_no": 6, "debt_open": 85, "debt_close": 20, "repay_ratio": 0.24},
+                {"chapter_no": 1, "debt_open": 70, "debt_close": 0, "repay_ratio": 0.0},
+                {"chapter_no": 3, "debt_open": 65, "debt_close": 35, "repay_ratio": 0.54},
+                {"chapter_no": 6, "debt_open": 85, "debt_close": 20, "repay_ratio": 0.24},
             ],
             hook_chain_map=hooks,
             format_constraint_sheet={
-                "format_lane": route.format_lane.value,
+                "chapter_form": route.format_lane.label,
                 "forbidden_cliche": route.forbidden_cliche_list,
-                "episode_duration_sec": capsule.target_duration_sec,
+                "target_chapter_count": capsule.target_chapter_count,
+                "target_chapter_words": capsule.target_chapter_words,
             },
             rights_compliance_stub={
                 "originality": "original_required",
@@ -635,8 +653,8 @@ class PreHubOrchestrator:
             },
             writing_brief_v1={
                 "winner_branch": winner.branch_description if winner else "",
-                "route": f"{route.content_lane.value}/{route.format_lane.value}",
-                "must_have": ["前三集钩子", "付费点前强情绪债", "每集结尾可剪成短视频钩子"],
+                "route": f"{route.content_lane.value}/{route.format_lane.label}",
+                "must_have": ["前三章读者承诺", "每章末追读钩子", "爽点密度与人物成长同步推进"],
             },
         )
 
@@ -652,12 +670,12 @@ class PreHubOrchestrator:
             "source_evidence": len(market.source_confidence_map) >= 2,
             "route_confidence": route.route_confidence >= 0.62,
             "hook_chain": len(narrative.hook_chain_map) >= 3,
-            "format_match": route.format_lane == capsule.preferred_format or route.route_confidence >= 0.72,
+            "chapter_form_match": route.format_lane == capsule.preferred_format or route.route_confidence >= 0.72,
             "rights_clean": not any(item.category == "rights" and item.level in {RiskLevel.HIGH, RiskLevel.CRITICAL} for item in risk_signals),
             "fallback_transparent": bool(market.fallback_reasons) == bool(self.fallback_reasons),
             "not_over_complex": route.content_lane != ContentLane.RISING_MIX or route.route_confidence >= 0.68,
             "author_bias_checked": True,
-            "production_burden_ok": route.production_burden_estimate.get("level") != "high",
+            "chapter_production_burden_ok": route.production_burden_estimate.get("level") != "high",
             "worth_writing": (narrative.winner_branch.total_score if narrative.winner_branch else 0) >= 60,
         }
         passed_count = sum(1 for value in checks.values() if value)
@@ -670,7 +688,7 @@ class PreHubOrchestrator:
             must_fix.append("人工复核所有 IP、肖像、素材来源授权。")
         if not checks["hook_chain"]:
             fatal.append(RiskItem(category="narrative", level=RiskLevel.HIGH, description="钩子链不足"))
-            must_fix.append("补齐前三集与付费点钩子链。")
+            must_fix.append("补齐前三章读者承诺与章尾追读钩子链。")
         if route.route_confidence < 0.55:
             fatal.append(RiskItem(category="route", level=RiskLevel.HIGH, description="路线置信度过低"))
 
@@ -688,7 +706,7 @@ class PreHubOrchestrator:
             project_id=capsule.project_id,
             rights_risk_pack=[item for item in risk_signals if item.category == "rights"],
             compliance_flags=[item.description for item in risk_signals if item.category == "compliance"],
-            route_mismatch_flag=not checks["format_match"],
+            route_mismatch_flag=not checks["chapter_form_match"],
             fatal_flaw_list=fatal,
             adversarial_report={"checks": checks, "passed_count": passed_count},
             rewrite_or_kill_decision=decision,
@@ -714,19 +732,19 @@ class PreHubOrchestrator:
         gate_scores = {
             "信源净化": max(30, source_score),
             "市场雷达": market_score,
-            "作者记忆": memory_score,
-            "赛道分流": route_score,
+            "本地项目知识": memory_score,
+            "小说赛道分流": route_score,
             "概念竞技": concept_score,
-            "叙事图谱": narrative_score,
+            "章节钩子图谱": narrative_score,
             "对抗验证": min(100, adversarial_score),
         }
         total = int(
             0.14 * gate_scores["信源净化"]
             + 0.18 * gate_scores["市场雷达"]
-            + 0.10 * gate_scores["作者记忆"]
-            + 0.18 * gate_scores["赛道分流"]
+            + 0.10 * gate_scores["本地项目知识"]
+            + 0.18 * gate_scores["小说赛道分流"]
             + 0.16 * gate_scores["概念竞技"]
-            + 0.12 * gate_scores["叙事图谱"]
+            + 0.12 * gate_scores["章节钩子图谱"]
             + 0.12 * gate_scores["对抗验证"]
         )
         if risk.rewrite_or_kill_decision == RewriteDecision.KILL:
@@ -744,7 +762,7 @@ class PreHubOrchestrator:
             required_actions=risk.must_fix_before_prod,
             fallback_reasons=sorted(set(self.fallback_reasons)),
             signoff={
-                "engine": "pre_hub_v4",
+                "engine": "fanqie_novel_preflight",
                 "mode": "auto_with_local_fallback",
                 "issued_by": "PreHubOrchestrator",
             },
@@ -763,12 +781,12 @@ class PreHubOrchestrator:
             author_id=bundle.project_capsule.author_id,
             project_id=bundle.project_id,
             memory_type=MemoryType.MARKET_CALIBRATION if bundle.market_context.fallback_reasons else MemoryType.PATTERN_SUCCESS,
-            condition=f"题材={bundle.project_capsule.project_title}; 路线={route.content_lane.value}/{route.format_lane.value}",
-            action=f"采用{bundle.narrative_seed.winner_branch.branch_description if bundle.narrative_seed.winner_branch else '默认'}并锁定钩子链",
-            result=f"Pre-Hub准入={passport.is_pass}; 总分={passport.total_score}; 决策={risk.rewrite_or_kill_decision.value}",
+            condition=f"题材={bundle.project_capsule.project_title}; 路线={route.content_lane.value}/{route.format_lane.label}",
+            action=f"采用{bundle.narrative_seed.winner_branch.branch_description if bundle.narrative_seed.winner_branch else '默认'}并锁定章节追读钩子链",
+            result=f"番茄前置准入={passport.is_pass}; 总分={passport.total_score}; 决策={risk.rewrite_or_kill_decision.value}",
             scope={
                 "content_lane": route.content_lane.value,
-                "format_lane": route.format_lane.value,
+                "chapter_form": route.format_lane.label,
                 "platform": bundle.project_capsule.target_platform.value,
             },
             evidence_refs=[
@@ -784,9 +802,9 @@ class PreHubOrchestrator:
     def _format_fit(self, capsule: ProjectCapsule, text: str, avg_conf: float) -> List[FormatFitItem]:
         lower = text.lower()
         scores = {
-            FormatLane.REAL: 58 + (18 if capsule.visual_core == VisualCore.REAL_RELATION else 0),
-            FormatLane.AI: 48 + (22 if any(k in lower for k in ["ai", "玄幻", "奇观", "异能"]) else 0),
-            FormatLane.MIXED: 56 + (12 if any(k in lower for k in ["混合", "ai辅助", "虚拟"]) else 0),
+            FormatLane.REAL: 58 + (18 if any(k in text for k in ["都市", "现实", "关系", "爽文", "逆袭"]) else 0),
+            FormatLane.AI: 48 + (22 if any(k in lower for k in ["ai", "玄幻", "系统", "异能", "修仙", "末世", "设定"]) else 0),
+            FormatLane.MIXED: 56 + (12 if any(k in text for k in ["悬疑", "群像", "多线", "考据", "知识库"]) else 0),
         }
         results = []
         for fmt, score in scores.items():
@@ -796,7 +814,7 @@ class PreHubOrchestrator:
                 FormatFitItem(
                     format_lane=fmt,
                     fit_score=min(100, score),
-                    reasons=[f"preferred={capsule.preferred_format.value}", f"avg_source_confidence={avg_conf:.2f}"],
+                    reasons=[f"preferred={capsule.preferred_format.label}", f"avg_source_confidence={avg_conf:.2f}"],
                     confidence=min(1.0, avg_conf + 0.1),
                 )
             )
@@ -824,7 +842,7 @@ class PreHubOrchestrator:
     @staticmethod
     def _classify_source(source: str, url: str) -> SourceTier:
         blob = f"{source} {url}".lower()
-        if any(k in blob for k in ["官方", "official", "gov", "redfruit"]):
+        if any(k in blob for k in ["官方", "official", "gov", "redfruit", "fanqie", "番茄"]):
             return SourceTier.OFFICIAL
         if any(k in blob for k in ["新浪", "腾讯", "网易", "搜狐", "央视", "新华社", "qq.com", "163.com"]):
             return SourceTier.MAINSTREAM
@@ -876,7 +894,7 @@ class PreHubOrchestrator:
         for chunk in re.split(r"[\s,，/|、]+", topic.strip()):
             if chunk and chunk not in tags:
                 tags.append(chunk[:12])
-        return tags[:8] or [topic[:12] or "短剧"]
+        return tags[:8] or [topic[:12] or "网文"]
 
     @staticmethod
     def _evidence_for_keywords(sources: List[Dict[str, Any]], keywords: List[str]) -> List[str]:

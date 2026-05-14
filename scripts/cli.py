@@ -87,22 +87,22 @@ def _ltm_review_command(project_id: Optional[str], apply_approved: bool) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="红果剧本一键制造机 CLI 控制塔")
+    parser = argparse.ArgumentParser(description="番茄小说一键制造机 CLI 控制台")
     subparsers = parser.add_subparsers(dest="command", help="选择子命令")
 
-    run_parser = subparsers.add_parser("run", help="启动全自动流水线处理 drafts/ 文件夹")
+    run_parser = subparsers.add_parser("run", help="启动章节流水线处理 drafts/ 文件夹")
     run_parser.add_argument("--no-cache", action="store_true", help="忽略现有解析快照，强制重新调用 LLM")
-    run_parser.add_argument("--bundle", help="Pre-Hub ContextBundle JSON 路径，用于注入立项上下文")
+    run_parser.add_argument("--bundle", help="前置立项 ContextBundle JSON 路径，用于注入新书上下文")
     run_parser.add_argument("--model-slot", help="选择 OpenAI Chat Completions 模型槽位，例如 model_slot_1")
 
     clear_parser = subparsers.add_parser("clear-cache", help="清理渲染缓存数据")
-    clear_parser.add_argument("--filter", type=str, help="根据关键词筛选清理特定题材或剧本")
+    clear_parser.add_argument("--filter", type=str, help="根据关键词筛选清理特定题材或章节快照")
     clear_parser.add_argument("--yes", action="store_true", help="跳过交互式确认，直接执行清理")
 
     subparsers.add_parser("stats", help="查看当前项目统计数据与转换率")
 
-    package_parser = subparsers.add_parser("package", help="将 scripts_output 中的成品剧本封装为投稿压缩包")
-    package_parser.add_argument("--name", required=True, help="项目名/剧名")
+    package_parser = subparsers.add_parser("package", help="将 scripts_output 中的章节产物封装为投稿/存稿包")
+    package_parser.add_argument("--name", required=True, help="项目名/书名")
     package_parser.add_argument("--genre", required=True, help="题材或投稿赛道")
     package_parser.add_argument("--author", required=True, help="笔名或工作室名")
 

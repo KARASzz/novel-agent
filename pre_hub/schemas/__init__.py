@@ -1,5 +1,5 @@
-"""Pre-Hub V4 Pydantic schemas."""
+"""番茄小说前置立项 Pydantic schemas."""
 
-from pre_hub.schemas.pre_hub_models import ContextBundleForParser, FormatLane
+from pre_hub.schemas.pre_hub_models import ChapterProductionBundle, ContextBundleForParser, FormatLane, NovelProjectBundle
 
-__all__ = ["ContextBundleForParser", "FormatLane"]
+__all__ = ["ContextBundleForParser", "NovelProjectBundle", "ChapterProductionBundle", "FormatLane"]

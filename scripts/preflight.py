@@ -45,14 +45,17 @@ def _build_markdown(bundle: ContextBundleForParser) -> str:
     memory = bundle.author_memory
 
     lines = [
-        "# Pre-Hub V4 前置决策报告",
+        "# 番茄小说前置立项报告",
         "",
         "## 项目信息",
         f"- 项目ID: {capsule.project_id}",
         f"- 标题: {capsule.project_title}",
         f"- 作者: {capsule.author_id}",
-        f"- 制作形态: {capsule.preferred_format.value}",
-        f"- 路由: {route.content_lane.value} / {route.format_lane.value}",
+        f"- 章节形态: {capsule.preferred_format.label}",
+        f"- 目标平台: {capsule.target_platform.value}",
+        f"- 目标章节: {capsule.target_chapter_count} 章",
+        f"- 单章字数: {capsule.target_chapter_words} 字",
+        f"- 路由: {route.content_lane.value} / {route.format_lane.label}",
         "",
         "## 准入结果",
         f"- 状态: {'PASS' if passport.is_pass else 'FAIL'}",
@@ -75,14 +78,14 @@ def _build_markdown(bundle: ContextBundleForParser) -> str:
             lines.append(f"- {item.source_name} / {item.source_tier.value} / conf={item.confidence:.2f} / {ref}")
     else:
         lines.append("- 无可用证据")
-    lines.extend(["", "## 作者记忆召回"])
+    lines.extend(["", "## 本地项目知识参考"])
     if memory.reusable_pattern_pack or memory.anti_pattern_blacklist:
         for item in memory.reusable_pattern_pack[:3]:
             lines.append(f"- 可复用: {str(item.get('content', ''))[:160]}")
         for item in memory.anti_pattern_blacklist[:3]:
             lines.append(f"- 风险: {str(item.get('content', ''))[:160]}")
     else:
-        lines.append("- 未召回可用作者记忆")
+        lines.append("- 未召回可用本地项目知识")
     lines.extend(["", "## 必须修复项"])
     if passport.required_actions:
         lines.extend(f"- {item}" for item in passport.required_actions)
@@ -99,7 +102,7 @@ def _write_markdown(bundle: ContextBundleForParser, path: str) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Pre-Hub V4 前置决策中台 - 项目准入评审")
+    parser = argparse.ArgumentParser(description="番茄小说前置立项中台 - 新书准入评审")
     parser.add_argument("topic", type=str, help="项目题材/关键词")
     parser.add_argument(
         "--format",
@@ -107,10 +110,10 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         choices=["real", "ai", "mixed"],
         default="real",
-        help="制作形态: real=真人精品, ai=AI奇观, mixed=混合辅助",
+        help="章节形态: real=正文连载型, ai=设定辅助型, mixed=混合增强型",
     )
     parser.add_argument("--author", type=str, default="default", help="作者ID")
-    parser.add_argument("--no-rag", action="store_true", help="禁用 Tavily/云端召回，仅使用本地降级")
+    parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
     parser.add_argument("--output", "-o", type=str, help="额外保存 Markdown 报告到指定路径")
     parser.add_argument("--save-bundle", type=str, help="保存 ContextBundle JSON 到指定目录或文件")
     return parser
@@ -126,7 +129,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "mixed": FormatLane.MIXED,
     }[args.format]
 
-    print(f"[PreFlight V4] topic={args.topic}, format={args.format}, author={args.author}")
+    print(f"[Novel Preflight] topic={args.topic}, chapter_form={args.format}, author={args.author}")
     print("=" * 60)
     bundle = PreHubOrchestrator().run(
         topic=args.topic,
@@ -138,7 +141,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     passport = bundle.preflight_passport
     capsule = bundle.project_capsule
     print("\n" + "=" * 60)
-    print("[PREFLIGHT PASSPORT]")
+    print("[NOVEL PREFLIGHT PASSPORT]")
     print("=" * 60)
     print(f"项目ID: {capsule.project_id}")
     print(f"项目标题: {capsule.project_title}")
@@ -162,7 +165,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(f"  - {action}")
 
     print("\n" + "=" * 60)
-    print("[CONTEXT BUNDLE] 注入摘要")
+    print("[NOVEL CONTEXT BUNDLE] 注入摘要")
     print("=" * 60)
     prompt = bundle.to_injection_prompt()
     print(prompt[:700] + "..." if len(prompt) > 700 else prompt)

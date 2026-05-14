@@ -28,6 +28,7 @@ class VersionedModel(StrictModel):
 
 class TargetPlatform(str, Enum):
     REDFRUIT = "redfruit"
+    FANQIE_NOVEL = "fanqie_novel"
 
 
 class EmotionCore(str, Enum):
@@ -53,9 +54,9 @@ class FormatLane(str, Enum):
     @property
     def label(self) -> str:
         return {
-            FormatLane.REAL: "真人精品",
-            FormatLane.AI: "AI奇观",
-            FormatLane.MIXED: "混合辅助",
+            FormatLane.REAL: "正文连载型",
+            FormatLane.AI: "设定辅助型",
+            FormatLane.MIXED: "混合增强型",
         }[self]
 
 
@@ -117,11 +118,11 @@ class AudienceZone(str, Enum):
 
 
 class ViewingMode(str, Enum):
-    REAL_EMOTION = "真人情绪型"
-    REAL_RELATION = "真人关系型"
-    AI_SPEC = "AI奇观型"
-    SERIES_ADDICT = "系列成瘾型"
-    SINGLE_BURST = "单部爆发型"
+    REAL_EMOTION = "强情绪快读型"
+    REAL_RELATION = "关系拉扯型"
+    AI_SPEC = "高概念设定型"
+    SERIES_ADDICT = "追更成瘾型"
+    SINGLE_BURST = "单章爆点型"
 
 
 class MemoryType(str, Enum):
@@ -243,9 +244,11 @@ class ProjectCapsule(VersionedModel):
     theme_tags: List[str] = Field(default_factory=list)
     emotion_core: EmotionCore = EmotionCore.COMPENSATION
     visual_core: VisualCore = VisualCore.REAL_RELATION
-    target_platform: TargetPlatform = TargetPlatform.REDFRUIT
+    target_platform: TargetPlatform = TargetPlatform.FANQIE_NOVEL
     target_episode_count: int = Field(default=60, ge=20, le=120)
     target_duration_sec: int = Field(default=90, ge=60, le=180)
+    target_chapter_count: int = Field(default=120, ge=20, le=3000)
+    target_chapter_words: int = Field(default=2200, ge=800, le=6000)
     preferred_format: FormatLane = FormatLane.REAL
     budget_tier: BudgetTier = BudgetTier.UNKNOWN
     hard_constraints: List[str] = Field(default_factory=list)
@@ -449,16 +452,16 @@ class ContextBundleForParser(VersionedModel):
         market = self.market_context
 
         lines = [
-            "[PreHub V4 ContextBundle]",
+            "[Novel Preflight ContextBundle]",
             f"ProjectID: {capsule.project_id}",
             f"Title: {capsule.project_title}",
             f"Premise: {capsule.one_line_premise}",
             f"EmotionCore: {capsule.emotion_core.value}",
             f"VisualCore: {capsule.visual_core.value}",
             f"TargetPlatform: {capsule.target_platform.value}",
-            f"TargetEpisodes: {capsule.target_episode_count}",
-            f"DurationSec: {capsule.target_duration_sec}",
-            f"FormatLane: {route.format_lane.value}",
+            f"TargetChapters: {capsule.target_chapter_count}",
+            f"TargetChapterWords: {capsule.target_chapter_words}",
+            f"ChapterForm: {route.format_lane.label}",
             f"ContentLane: {route.content_lane.value}",
             f"RouteConfidence: {route.route_confidence:.2f}",
             f"MarketAsOf: {market.as_of_date}",
@@ -470,7 +473,7 @@ class ContextBundleForParser(VersionedModel):
             lines.append(f"WinnerBranch: {narrative.winner_branch.branch_description}")
         if narrative.hook_chain_map:
             hooks = "; ".join(
-                f"EP{node.episode_no} {node.hook_type} {node.hook_text}"
+                f"CH{node.episode_no} {node.hook_type} {node.hook_text}"
                 for node in narrative.hook_chain_map[:6]
             )
             lines.append(f"HookChain: {hooks}")
@@ -478,18 +481,22 @@ class ContextBundleForParser(VersionedModel):
             lines.append(f"ForbiddenCliches: {', '.join(route.forbidden_cliche_list)}")
         if memory.reusable_pattern_pack:
             patterns = "; ".join(str(item.get("content") or item.get("title") or item)[:120] for item in memory.reusable_pattern_pack[:3])
-            lines.append(f"AuthorReusablePatterns: {patterns}")
+            lines.append(f"ProjectKnowledgePatterns: {patterns}")
         if memory.anti_pattern_blacklist:
             anti = "; ".join(str(item.get("content") or item.get("title") or item)[:120] for item in memory.anti_pattern_blacklist[:3])
-            lines.append(f"AuthorAntiPatterns: {anti}")
+            lines.append(f"ProjectKnowledgeAntiPatterns: {anti}")
         if risk.must_fix_before_prod:
             lines.append(f"MustFixBeforeProduction: {', '.join(risk.must_fix_before_prod)}")
         if risk.compliance_flags:
             lines.append(f"ComplianceFlags: {', '.join(risk.compliance_flags)}")
         if self.fallback_reasons:
             lines.append(f"FallbackReasons: {', '.join(self.fallback_reasons)}")
-        lines.append("[End PreHub V4 ContextBundle]")
+        lines.append("[End Novel Preflight ContextBundle]")
         return "\n".join(lines)
+
+
+NovelProjectBundle = ContextBundleForParser
+ChapterProductionBundle = ContextBundleForParser
 
 
 # Backward-compatible layer shells used by existing helper modules.
@@ -515,7 +522,7 @@ class Layer2Output(StrictModel):
     prediction_error_band: Dict[str, Any] = Field(default_factory=dict)
     viewing_mode_scores: Dict[str, float] = Field(default_factory=dict)
     audience_segment_fit: Dict[str, float] = Field(default_factory=dict)
-    redfruit_fit_hypothesis: str = ""
+    fanqie_fit_hypothesis: str = ""
 
 
 class Layer3Output(StrictModel):

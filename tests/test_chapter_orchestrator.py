@@ -3,6 +3,7 @@ from chapter_pipeline.orchestrator import (
     SIX_B_ITERATION_ROUNDS,
     AgentLevel,
     ChapterOrchestrator,
+    ExecutionMode,
 )
 from chapter_pipeline.prompt_registry import ChapterPromptRegistry, PROMPT_BLOCK_TAGS
 
@@ -45,6 +46,38 @@ def test_chapter_orchestrator_builds_6a_6b_fixed_rounds():
 
     stage_7 = next(task for task in plan.tasks if task.task_id == "stage_7")
     assert stage_7.depends_on == ["stage_6b_beats_5_6_round_6"]
+
+
+def test_stage_6_tasks_are_never_parallel():
+    plan = ChapterOrchestrator().build_plan(
+        project_goal="番茄小说章节生产",
+        current_chapter="第一章",
+        previous_chapter_script="上一章状态",
+    )
+
+    stage_6_tasks = [task for task in plan.tasks if task.task_id.startswith("stage_6")]
+    assert len([task for task in stage_6_tasks if task.task_id.startswith("stage_6b")]) == 18
+    assert all(task.execution_mode == ExecutionMode.SERIAL for task in stage_6_tasks)
+    assert all(task.can_run_parallel is False for task in stage_6_tasks)
+
+    qa_task = next(task for task in plan.tasks if task.task_id == "qa_acceptance_parallel")
+    assert qa_task.execution_mode == ExecutionMode.PARALLEL
+    assert qa_task.can_run_parallel is True
+
+
+def test_plan_validation_rejects_parallel_stage_6():
+    plan = ChapterOrchestrator().build_plan(
+        project_goal="番茄小说章节生产",
+        current_chapter="第一章",
+        previous_chapter_script="上一章状态",
+    )
+    task = next(task for task in plan.tasks if task.task_id == "stage_6b_beats_1_2_round_1")
+    task.execution_mode = ExecutionMode.PARALLEL
+
+    import pytest
+
+    with pytest.raises(ValueError, match="Stage 6 must be strictly serial"):
+        plan.validate()
 
 
 def test_chapter_orchestrator_uses_hierarchical_roles_and_ledger():

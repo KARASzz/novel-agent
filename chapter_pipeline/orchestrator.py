@@ -20,6 +20,11 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
+class ExecutionMode(str, Enum):
+    SERIAL = "serial"
+    PARALLEL = "parallel"
+
+
 SIX_B_ITERATION_ROUNDS = (
     "事件推进",
     "身体感受",
@@ -57,6 +62,7 @@ class AgentTask:
     worker: Optional[str]
     prompt_block: Optional[str]
     depends_on: List[str] = field(default_factory=list)
+    execution_mode: ExecutionMode = ExecutionMode.SERIAL
     can_run_parallel: bool = False
     status: TaskStatus = TaskStatus.PENDING
     retry_count: int = 0
@@ -65,6 +71,7 @@ class AgentTask:
     def to_dict(self) -> Dict[str, object]:
         payload = asdict(self)
         payload["agent_level"] = self.agent_level.value
+        payload["execution_mode"] = self.execution_mode.value
         payload["status"] = self.status.value
         return payload
 
@@ -75,6 +82,38 @@ class ChapterExecutionPlan:
     tasks: List[AgentTask]
     prompt_blocks: List[str]
     six_b_rounds: List[str]
+
+    def task_map(self) -> Dict[str, AgentTask]:
+        return {task.task_id: task for task in self.tasks}
+
+    def validate(self) -> None:
+        tasks = self.task_map()
+
+        stage_6_tasks = [task for task in self.tasks if task.task_id.startswith("stage_6")]
+        for task in stage_6_tasks:
+            if task.can_run_parallel or task.execution_mode != ExecutionMode.SERIAL:
+                raise ValueError(f"Stage 6 must be strictly serial: {task.task_id}")
+
+        previous_task = "stage_5"
+        for left, right in BEAT_GROUPS:
+            group_id = f"beats_{left}_{right}"
+            draft_task_id = f"stage_6a_{group_id}"
+            draft_task = tasks[draft_task_id]
+            if draft_task.depends_on != [previous_task]:
+                raise ValueError(f"Invalid 6A dependency: {draft_task_id}")
+
+            previous_round_id = draft_task_id
+            for round_index in range(1, len(SIX_B_ITERATION_ROUNDS) + 1):
+                round_task_id = f"stage_6b_{group_id}_round_{round_index}"
+                round_task = tasks[round_task_id]
+                if round_task.depends_on != [previous_round_id]:
+                    raise ValueError(f"Invalid 6B dependency: {round_task_id}")
+                previous_round_id = round_task_id
+            previous_task = previous_round_id
+
+        stage_7 = tasks["stage_7"]
+        if stage_7.depends_on != ["stage_6b_beats_5_6_round_6"]:
+            raise ValueError("Stage 7 must wait for the final 6B round.")
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -222,6 +261,7 @@ class ChapterOrchestrator:
                 prompt_block=None,
                 depends_on=["stage_8"],
                 can_run_parallel=True,
+                execution_mode=ExecutionMode.PARALLEL,
             )
         )
 
@@ -243,9 +283,11 @@ class ChapterOrchestrator:
         if not previous_chapter_script:
             ledger.human_decisions.append("缺少上一章第9步回写时，只允许使用最小临时假设。")
 
-        return ChapterExecutionPlan(
+        plan = ChapterExecutionPlan(
             ledger=ledger,
             tasks=tasks,
             prompt_blocks=list(self.prompt_registry.names()),
             six_b_rounds=list(SIX_B_ITERATION_ROUNDS),
         )
+        plan.validate()
+        return plan
