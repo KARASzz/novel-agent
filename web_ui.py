@@ -39,6 +39,25 @@ except AttributeError:  # pragma: no cover - fallback template shim
 
 file_catalog = GeneratedFileCatalog(BASE_DIR)
 
+REQUIRED_WEBNOVEL_TEMPLATES = (
+    "webnovel_outline_template_v1.md",
+    "webnovel_setting_bible_template_v1.md",
+    "webnovel_orchestration_template_v1.md",
+    "webnovel_volume_story_list_template_v1.md",
+    "webnovel_chapter_construction_card_template_v1.md",
+    "webnovel_handoff_gate_template_v1.md",
+)
+
+REMOVED_LEGACY_FLOW_FILES = (
+    "core_engine/parser.py",
+    "core_engine/batch_processor.py",
+    "core_engine/renderer.py",
+    "core_engine/main_pipeline.py",
+    "core_engine/schemas.py",
+    "core_engine/parser_prompts/chapter_parser_prompt.txt",
+    "core_engine/parser_prompts/episode_parser_prompt.txt",
+)
+
 
 def _latest_execution_plan_path() -> Optional[Path]:
     output_root = Path(BASE_DIR) / "novel_outputs"
@@ -201,6 +220,122 @@ def _orchestrator_status_payload() -> Dict[str, Any]:
     }
 
 
+def _initialization_self_check_payload() -> Dict[str, Any]:
+    checks: List[Dict[str, Any]] = []
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    def add_check(name: str, status: str, detail: str) -> None:
+        checks.append({"name": name, "status": status, "detail": detail})
+        if status == "fail":
+            errors.append(f"{name}: {detail}")
+        elif status == "warning":
+            warnings.append(f"{name}: {detail}")
+
+    try:
+        cfg = load_config()
+        add_check("配置读取", "pass", "config.yaml 已成功加载。")
+    except Exception as exc:
+        return {
+            "status": "fail",
+            "title": "初始化自检失败",
+            "summary": f"配置读取失败: {exc}",
+            "checks": [{"name": "配置读取", "status": "fail", "detail": str(exc)}],
+            "errors": [str(exc)],
+            "warnings": [],
+        }
+
+    registry = cfg.get("models", {})
+    slots = registry.get("slots", {}) if isinstance(registry.get("slots"), dict) else {}
+    enabled_slots = [slot for slot, item in slots.items() if isinstance(item, dict) and item.get("enabled", True)]
+    if slots:
+        add_check("模型槽位", "pass", f"已发现 {len(slots)} 个槽位，启用 {len(enabled_slots)} 个。")
+    else:
+        add_check("模型槽位", "fail", "未发现 models.slots 配置。")
+    for slot_name in enabled_slots:
+        slot_cfg = slots.get(slot_name, {})
+        env_name = str(slot_cfg.get("api_key_env") or "").strip()
+        base_url = str(slot_cfg.get("base_url") or "").strip()
+        model_id = str(slot_cfg.get("model_id") or "").strip()
+        if not base_url or not model_id or not env_name:
+            add_check(slot_name, "fail", "启用槽位缺少 base_url、model_id 或 api_key_env。")
+        elif os.getenv(env_name):
+            add_check(slot_name, "pass", f"{model_id} 已配置，环境变量 {env_name} 可读取。")
+        else:
+            add_check(slot_name, "warning", f"{model_id} 已配置，但当前进程未读取到环境变量 {env_name}。")
+
+    template_dir = Path(BASE_DIR) / "templates"
+    missing_templates = [name for name in REQUIRED_WEBNOVEL_TEMPLATES if not (template_dir / name).is_file()]
+    if missing_templates:
+        add_check("大纲中台模板", "fail", "缺失: " + ", ".join(missing_templates))
+    else:
+        add_check("大纲中台模板", "pass", "6 个 webnovel_* 模板齐备。")
+
+    legacy_present = [path for path in REMOVED_LEGACY_FLOW_FILES if (Path(BASE_DIR) / path).exists()]
+    if legacy_present:
+        add_check("旧草稿清洗链路", "fail", "仍存在: " + ", ".join(legacy_present))
+    else:
+        add_check("旧草稿清洗链路", "pass", "旧 parser/batch/renderer/main_pipeline 文件未发现。")
+
+    try:
+        snapshot = _load_or_build_plan_snapshot()
+        task_count = len(snapshot["plan"].get("tasks", []))
+        add_check("九步编排初始化", "pass", f"{snapshot['source_label']} 可读取，任务数 {task_count}。")
+    except Exception as exc:
+        add_check("九步编排初始化", "fail", str(exc))
+
+    try:
+        from core_engine.validator import FanqieChapterValidator
+
+        sample = (
+            "第一章：旧站台的电话\n"
+            "上一章留下的证据还在掌心发烫，林照刚踏进旧站台，就被债主的人堵在检票口。"
+            "对方逼他交出名单，还当众夺走母亲留下的怀表。林照没有退，他反手把录音笔按开，"
+            "让所有人都听见对方威胁孤儿院的证据。人群一下炸开，债主脸色铁青。"
+            "林照完成反击，可电话突然响起，屏幕上只有一句话：真正的名单，在你父亲坟前。"
+        )
+        report = FanqieChapterValidator(min_words=80, max_words=1000).validate(sample)
+        if report.is_valid:
+            add_check("章节质检器", "pass", f"番茄章节质检器可用，样章评分 {report.score}。")
+        else:
+            add_check("章节质检器", "fail", "样章未通过: " + "; ".join(report.errors))
+    except Exception as exc:
+        add_check("章节质检器", "fail", str(exc))
+
+    writable_targets = [Path(BASE_DIR) / "novel_outputs", Path(BASE_DIR) / "reports"]
+    for target in writable_targets:
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            probe = target / ".self_check_write_probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            add_check(f"目录写入 {target.name}", "pass", f"{target} 可写。")
+        except Exception as exc:
+            add_check(f"目录写入 {target.name}", "fail", str(exc))
+
+    if errors:
+        status = "fail"
+        title = "初始化自检未通过"
+        summary = f"{len(errors)} 项失败，{len(warnings)} 项警告。"
+    elif warnings:
+        status = "warning"
+        title = "初始化自检完成，有警告"
+        summary = f"核心链路可初始化，存在 {len(warnings)} 项警告。"
+    else:
+        status = "pass"
+        title = "初始化自检通过"
+        summary = "配置、模板、九步编排、质检器和输出目录均可用。"
+
+    return {
+        "status": status,
+        "title": title,
+        "summary": summary,
+        "checks": checks,
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
 DASHBOARD_SECTIONS = [
     {
         "title": "立项与项目包",
@@ -244,6 +379,7 @@ DASHBOARD_SECTIONS = [
         "tone": "module-system",
         "description": "缓存、模型诊断和控制台进程管理。",
         "commands": [
+            {"id": "init_self_check", "label": "一键初始化自检", "icon": "🧪"},
             {"id": "model_diag", "label": "模型诊断", "icon": "🧬"},
             {"id": "cache", "label": "清理缓存", "icon": "🧹"},
             {"id": "exit", "label": "关闭网页控制台", "icon": "🚪", "danger": True},
@@ -303,6 +439,11 @@ async def generated_files():
 @app.get("/api/orchestrator-status")
 async def orchestrator_status():
     return _orchestrator_status_payload()
+
+
+@app.post("/api/initialization-self-check")
+async def initialization_self_check():
+    return _initialization_self_check_payload()
 
 
 @app.post("/api/open-file/{file_id}")

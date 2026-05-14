@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import web_ui
 from web_file_catalog import GeneratedFileCatalog
 
@@ -60,6 +58,61 @@ def test_web_ui_no_longer_exposes_legacy_pipeline_command(monkeypatch):
         for section in web_ui.DASHBOARD_SECTIONS
         for command in section["commands"]
     }
+
+
+def test_dashboard_exposes_initialization_self_check_button():
+    command_ids = {
+        command["id"]
+        for section in web_ui.DASHBOARD_SECTIONS
+        for command in section["commands"]
+    }
+
+    assert "init_self_check" in command_ids
+
+
+def test_initialization_self_check_payload_passes_core_checks(monkeypatch, tmp_path):
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    for name in web_ui.REQUIRED_WEBNOVEL_TEMPLATES:
+        (templates / name).write_text("# template", encoding="utf-8")
+
+    monkeypatch.setattr(web_ui, "BASE_DIR", str(tmp_path))
+    monkeypatch.setenv("MODEL_SLOT_1_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        web_ui,
+        "load_config",
+        lambda: {
+            "models": {
+                "default_slot": "model_slot_1",
+                "slots": {
+                    "model_slot_1": {
+                        "display_name": "测试模型",
+                        "base_url": "https://example.test/v1",
+                        "api_key_env": "MODEL_SLOT_1_API_KEY",
+                        "model_id": "model-test",
+                        "enabled": True,
+                    }
+                },
+            }
+        },
+    )
+    monkeypatch.setattr(
+        web_ui,
+        "_load_or_build_plan_snapshot",
+        lambda: {
+            "source_label": "测试计划",
+            "plan": {
+                "tasks": [{"task_id": "ceo_intake", "status": "pending"}],
+                "ledger": {},
+            },
+        },
+    )
+
+    payload = web_ui._initialization_self_check_payload()
+
+    assert payload["status"] == "pass"
+    assert any(item["name"] == "大纲中台模板" and item["status"] == "pass" for item in payload["checks"])
+    assert any(item["name"] == "旧草稿清洗链路" and item["status"] == "pass" for item in payload["checks"])
 
 
 def test_generated_file_catalog_lists_default_app_open_url(tmp_path):

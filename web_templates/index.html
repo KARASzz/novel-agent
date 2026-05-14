@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>番茄小说一键制造机 - 控制台</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         :root {
             --page: #eef2f1;
@@ -235,6 +236,9 @@
         .status-completed { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
         .status-running { background: #fff7dd; border-color: #e7cc72; color: #745414; }
         .status-failed { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
+        .status-pass { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
+        .status-warning { background: #fff7dd; border-color: #e7cc72; color: #745414; }
+        .status-fail { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
         .stage6-board {
             display: grid;
             gap: 8px;
@@ -395,6 +399,105 @@
             min-height: 220px;
             flex: 1;
         }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .48);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 20;
+        }
+        .modal-backdrop[hidden] { display: none; }
+        .modal-dialog {
+            width: min(620px, 100%);
+            max-height: min(720px, 88vh);
+            overflow: hidden;
+            border: 1px solid #b8c5d0;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 18px 48px rgba(15, 23, 42, .28);
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-head {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .modal-title {
+            margin: 0;
+            font-size: 17px;
+            letter-spacing: 0;
+        }
+        .modal-status {
+            white-space: nowrap;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 12px;
+            border: 1px solid #c9d3dc;
+            background: #f8fafc;
+            color: #334155;
+        }
+        .modal-status.pass { background: #e8f7ed; border-color: #a9d8b7; color: #18623a; }
+        .modal-status.warning { background: #fff7dd; border-color: #e7cc72; color: #745414; }
+        .modal-status.fail { background: #ffe9ed; border-color: #e0a4ae; color: #8a1f35; }
+        .modal-body {
+            padding: 14px 16px;
+            overflow: auto;
+        }
+        .modal-summary {
+            margin: 0 0 12px;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .check-list {
+            display: grid;
+            gap: 8px;
+        }
+        .check-row {
+            border: 1px solid #e2e8ee;
+            border-radius: 6px;
+            padding: 9px 10px;
+            background: #fbfdff;
+        }
+        .check-row-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        .check-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #17212b;
+        }
+        .check-detail {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+        .modal-foot {
+            padding: 12px 16px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: flex-end;
+        }
+        .modal-ok {
+            min-width: 88px;
+            justify-content: center;
+            background: #17212b;
+            color: #ffffff;
+            border-color: #17212b;
+        }
+        .modal-ok:hover { background: #243241; border-color: #243241; }
         @media (max-width: 980px) {
             .shell { grid-template-columns: 1fr; }
             .module-grid { grid-template-columns: 1fr; }
@@ -460,7 +563,7 @@
                 <div class="subsection-head">
                     <h2>Agent 层级与任务状态</h2>
                 </div>
-                <div id="agentBody" class="agent-columns"></div>
+                <div id="agentChartContainer" style="width: 100%; height: 450px; border: 1px solid #d6dde6; border-radius: 8px; background: white; margin-bottom: 12px; overflow: hidden;"></div>
 
                 <div class="subsection-head">
                     <h2>第6A / 第6B 产物差异</h2>
@@ -510,6 +613,22 @@
             </section>
         </aside>
     </main>
+
+    <div class="modal-backdrop" id="selfCheckModal" hidden role="dialog" aria-modal="true" aria-labelledby="selfCheckTitle">
+        <section class="modal-dialog">
+            <div class="modal-head">
+                <h2 class="modal-title" id="selfCheckTitle">初始化自检</h2>
+                <span class="modal-status" id="selfCheckStatus">等待</span>
+            </div>
+            <div class="modal-body">
+                <p class="modal-summary" id="selfCheckSummary">等待自检结果。</p>
+                <div class="check-list" id="selfCheckList"></div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="modal-ok" onclick="closeSelfCheckModal()">OK</button>
+            </div>
+        </section>
+    </div>
 
     <script id="initialOrchestratorStatus" type="application/json">{{ orchestrator_status | tojson }}</script>
     <script>
@@ -568,39 +687,109 @@
             ledgerBody.appendChild(createStatusCard('人工裁决点', ledger.human_decisions || [], true));
             ledgerBody.appendChild(createStatusCard('禁止事项', ledger.forbidden || [], true));
 
-            const agentBody = document.getElementById('agentBody');
-            agentBody.innerHTML = '';
-            for (const group of payload.agents || []) {
-                const column = document.createElement('section');
-                column.className = 'agent-column';
-                const title = document.createElement('h3');
-                title.textContent = `${group.level} · ${group.completed || 0}/${group.total || 0}`;
-                column.appendChild(title);
-                const list = document.createElement('div');
-                list.className = 'task-list';
-                for (const task of group.tasks || []) {
-                    const row = document.createElement('div');
-                    row.className = 'task-row';
-                    const head = document.createElement('div');
-                    head.className = 'round-head';
-                    const id = document.createElement('span');
-                    id.textContent = task.task_id;
-                    head.appendChild(id);
-                    head.appendChild(statusBadge(task.status));
-                    const taskTitle = document.createElement('div');
-                    taskTitle.className = 'task-title';
-                    taskTitle.textContent = task.title;
-                    const meta = document.createElement('div');
-                    meta.className = 'task-meta';
-                    meta.textContent = `${task.manager}${task.worker ? ' / ' + task.worker : ''} · retry ${task.retry_count || 0}`;
-                    row.appendChild(head);
-                    row.appendChild(taskTitle);
-                    row.appendChild(meta);
-                    list.appendChild(row);
+            // --- ECharts Tree Render ---
+            const chartContainer = document.getElementById('agentChartContainer');
+            if (chartContainer && typeof echarts !== 'undefined') {
+                let myChart = echarts.getInstanceByDom(chartContainer);
+                if (!myChart) {
+                    myChart = echarts.init(chartContainer);
+                    window.addEventListener('resize', () => myChart.resize());
                 }
-                column.appendChild(list);
-                agentBody.appendChild(column);
+
+                const statusColorMap = { 'completed': '#a9d8b7', 'running': '#e7cc72', 'failed': '#e0a4ae', 'pending': '#c9d3dc', 'pass': '#a9d8b7', 'warning': '#e7cc72', 'fail': '#e0a4ae' };
+                const statusTextColorMap = { 'completed': '#18623a', 'running': '#745414', 'failed': '#8a1f35', 'pending': '#334155', 'pass': '#18623a', 'warning': '#745414', 'fail': '#8a1f35' };
+                const statusBgColorMap = { 'completed': '#e8f7ed', 'running': '#fff7dd', 'failed': '#ffe9ed', 'pending': '#f8fafc', 'pass': '#e8f7ed', 'warning': '#fff7dd', 'fail': '#ffe9ed' };
+
+                const rootData = {
+                    name: 'Orchestrator\n引擎核心',
+                    itemStyle: { color: '#182332', borderColor: '#182332' },
+                    label: { color: '#ffffff', fontSize: 13, fontWeight: 'bold', lineHeight: 18 },
+                    symbolSize: [120, 50],
+                    symbol: 'roundRect',
+                    children: []
+                };
+
+                for (const group of payload.agents || []) {
+                    const levelNode = {
+                        name: `${group.level}\n(${group.completed || 0}/${group.total || 0})`,
+                        itemStyle: { color: '#edf7fb', borderColor: '#b9d6ec', borderWidth: 2 },
+                        label: { color: '#17212b', fontSize: 12, fontWeight: 'bold', lineHeight: 16 },
+                        symbolSize: [120, 48],
+                        symbol: 'roundRect',
+                        children: []
+                    };
+
+                    for (const task of group.tasks || []) {
+                        let status = task.status || 'pending';
+                        let strokeCol = statusColorMap[status] || statusColorMap['pending'];
+                        let textCol = statusTextColorMap[status] || statusTextColorMap['pending'];
+                        let bgCol = statusBgColorMap[status] || statusBgColorMap['pending'];
+                        let shortTitle = task.title.length > 12 ? task.title.substring(0, 11) + '...' : task.title;
+
+                        levelNode.children.push({
+                            name: `${task.task_id}\n${shortTitle}`,
+                            value: task.status,
+                            itemStyle: { color: bgCol, borderColor: strokeCol, borderWidth: 1.5 },
+                            label: { color: textCol, fontSize: 11, lineHeight: 15 },
+                            symbolSize: [120, 44],
+                            symbol: 'roundRect',
+                            tooltip: {
+                                formatter: function() {
+                                    return `<b>${task.title}</b><br/>ID: ${task.task_id}<br/>Manager: ${task.manager || 'N/A'}<br/>Worker: ${task.worker || 'N/A'}<br/>Status: ${status}<br/>Retries: ${task.retry_count || 0}`;
+                                }
+                            }
+                        });
+                    }
+                    rootData.children.push(levelNode);
+                }
+
+                const option = {
+                    tooltip: {
+                        trigger: 'item',
+                        triggerOn: 'mousemove',
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderColor: '#d6dde6',
+                        borderWidth: 1,
+                        textStyle: { color: '#17212b', fontSize: 12 },
+                        padding: 10,
+                        extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 8px;'
+                    },
+                    series: [
+                        {
+                            type: 'tree',
+                            data: [rootData],
+                            top: '8%',
+                            bottom: '8%',
+                            left: '10%',
+                            right: '25%',
+                            layout: 'orthogonal',
+                            orient: 'LR',
+                            symbol: 'emptyCircle',
+                            edgeShape: 'curve',
+                            initialTreeDepth: 2,
+                            lineStyle: { color: '#cbd6dc', width: 2, curveness: 0.2 },
+                            label: {
+                                position: 'inside',
+                                verticalAlign: 'middle',
+                                align: 'center',
+                                fontSize: 12
+                            },
+                            leaves: {
+                                label: {
+                                    position: 'inside',
+                                    verticalAlign: 'middle',
+                                    align: 'center'
+                                }
+                            },
+                            expandAndCollapse: true,
+                            animationDuration: 550,
+                            animationDurationUpdate: 750
+                        }
+                    ]
+                };
+                myChart.setOption(option);
             }
+            // --- End ECharts Tree Render ---
 
             const stage6Body = document.getElementById('stage6Body');
             stage6Body.innerHTML = '';
@@ -758,7 +947,70 @@
             }
         }
 
+        function closeSelfCheckModal() {
+            document.getElementById('selfCheckModal').hidden = true;
+        }
+
+        function renderSelfCheckModal(payload) {
+            const modal = document.getElementById('selfCheckModal');
+            const title = document.getElementById('selfCheckTitle');
+            const status = document.getElementById('selfCheckStatus');
+            const summary = document.getElementById('selfCheckSummary');
+            const list = document.getElementById('selfCheckList');
+            const state = payload.status || 'fail';
+            title.textContent = payload.title || '初始化自检结果';
+            status.className = `modal-status ${state}`;
+            status.textContent = state === 'pass' ? '通过' : state === 'warning' ? '警告' : '失败';
+            summary.textContent = payload.summary || '未返回摘要。';
+            list.innerHTML = '';
+            for (const item of payload.checks || []) {
+                const row = document.createElement('div');
+                row.className = 'check-row';
+                const head = document.createElement('div');
+                head.className = 'check-row-head';
+                const name = document.createElement('div');
+                name.className = 'check-name';
+                name.textContent = item.name || '检查项';
+                head.appendChild(name);
+                head.appendChild(statusBadge(item.status));
+                const detail = document.createElement('div');
+                detail.className = 'check-detail';
+                detail.textContent = item.detail || '';
+                row.appendChild(head);
+                row.appendChild(detail);
+                list.appendChild(row);
+            }
+            modal.hidden = false;
+        }
+
+        async function runInitializationSelfCheck() {
+            const outputBox = document.getElementById('output');
+            document.getElementById('lastRun').textContent = '执行中: init_self_check';
+            outputBox.textContent = '[System] 正在执行一键初始化自检...\n';
+            try {
+                const response = await fetch('/api/initialization-self-check', {method: 'POST'});
+                const payload = await response.json();
+                renderSelfCheckModal(payload);
+                outputBox.textContent += `\n[Result]\n${payload.title}\n${payload.summary}`;
+                document.getElementById('lastRun').textContent = '完成: init_self_check';
+            } catch (error) {
+                const payload = {
+                    status: 'fail',
+                    title: '初始化自检请求失败',
+                    summary: String(error),
+                    checks: [{name: '前端请求', status: 'fail', detail: String(error)}]
+                };
+                renderSelfCheckModal(payload);
+                outputBox.textContent += `\n[Error] 请求失败: ${error}`;
+                document.getElementById('lastRun').textContent = '失败: init_self_check';
+            }
+        }
+
         async function runCommand(cmd) {
+            if (cmd === 'init_self_check') {
+                await runInitializationSelfCheck();
+                return;
+            }
             const outputBox = document.getElementById('output');
             const modelSlot = document.getElementById('modelSelect').value;
             document.getElementById('lastRun').textContent = `执行中: ${cmd}`;
