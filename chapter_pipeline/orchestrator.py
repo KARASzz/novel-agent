@@ -389,7 +389,7 @@ class ChapterOrchestrator:
                 agent_level=AgentLevel.MANAGER,
                 manager="QA Manager Agent",
                 worker="Acceptance Worker Agent",
-                prompt_block=None,
+                prompt_block="qa_acceptance_parallel",
                 depends_on=["stage_8"],
                 can_run_parallel=True,
                 execution_mode=ExecutionMode.PARALLEL,
@@ -618,7 +618,21 @@ class ChapterOrchestrator:
                 raise RuntimeError(task.failure_reason)
             
             task.status = TaskStatus.RUNNING
-            
+
+            if task.task_id == "qa_acceptance_parallel":
+                task.input_payload = {
+                    **task.input_payload,
+                    "stage_7_output": dict(plan.task_map()["stage_7"].output_payload),
+                    "stage_8_output": dict(plan.task_map()["stage_8"].output_payload),
+                    "stage_9_output": dict(plan.task_map()["stage_9"].output_payload),
+                    "chapter_text_preview": self._build_chapter_text(plan),
+                    "stage_summaries": {
+                        stage.task_id: str(stage.output_payload.get("summary", ""))
+                        for stage in plan.tasks
+                        if stage.task_id.startswith("stage_")
+                    },
+                }
+
             prompt_block = None
             if task.prompt_block:
                 try:
@@ -627,41 +641,39 @@ class ChapterOrchestrator:
                     prompt_block = None
 
             if not prompt_block:
-                # 只有验收任务可以特殊处理，其余必须由 LLM 完成
-                if task.task_id == "qa_acceptance_parallel":
-                     task.output_payload = {"summary": "并行 QA 验收已跳过（生产模式建议启用真实评审）。", "status": "pass"}
-                else:
-                     task.output_payload = self._standard_task_output(task)
-            else:
-                # 执行真实 LLM 调用
-                try:
-                    res = self.llm_client.create_response(
-                        model=model_id,
-                        instructions=prompt_block,
-                        input_text=json.dumps(task.input_payload, ensure_ascii=False),
-                        temperature=0.7
-                    )
-                    content = res.output_text
-                    
-                    # 如果输出疑似 JSON，尝试解析摘要，否则原样保留正文
-                    summary = f"已完成 {task.title}"
-                    try:
-                        clean_json = self._clean_content(content)
-                        obj = json.loads(clean_json)
-                        if isinstance(obj, dict):
-                            task.output_payload = obj
-                            summary = obj.get("summary", summary)
-                        else:
-                            task.output_payload = {"content": content, "summary": summary}
-                    except Exception:
-                        task.output_payload = {"content": content, "summary": summary}
+                task.status = TaskStatus.FAILED
+                task.failure_reason = f"missing_prompt_block:{task.task_id}"
+                raise RuntimeError(task.failure_reason)
 
-                except Exception as e:
-                    task.status = TaskStatus.FAILED
-                    task.failure_reason = str(e)
-                    if verbose:
-                        print(f"❌ [Orchestrator] Task {task.task_id} failed: {e}", flush=True)
-                    raise
+            # 执行真实 LLM 调用
+            try:
+                res = self.llm_client.create_response(
+                    model=model_id,
+                    instructions=prompt_block,
+                    input_text=json.dumps(task.input_payload, ensure_ascii=False),
+                    temperature=0.7
+                )
+                content = res.output_text
+
+                # 如果输出疑似 JSON，尝试解析摘要，否则原样保留正文
+                summary = f"已完成 {task.title}"
+                try:
+                    clean_json = self._clean_content(content)
+                    obj = json.loads(clean_json)
+                    if isinstance(obj, dict):
+                        task.output_payload = obj
+                        summary = obj.get("summary", summary)
+                    else:
+                        task.output_payload = {"content": content, "summary": summary}
+                except Exception:
+                    task.output_payload = {"content": content, "summary": summary}
+
+            except Exception as e:
+                task.status = TaskStatus.FAILED
+                task.failure_reason = str(e)
+                if verbose:
+                    print(f"❌ [Orchestrator] Task {task.task_id} failed: {e}", flush=True)
+                raise
 
             task.status = TaskStatus.COMPLETED
             task.final_decision = "llm_completed"

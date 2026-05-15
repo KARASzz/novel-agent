@@ -52,6 +52,7 @@ logs/
 # Project Outputs & Cache
 .cache/
 novel_outputs/
+runs/
 scripts_output/
 reports/
 output/

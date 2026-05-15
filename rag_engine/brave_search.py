@@ -1,7 +1,7 @@
 import os
 import json
 import asyncio
-from typing import Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from rag_engine.mcp_client import call_mcp_tool
 
 def _safe_print(message: str) -> None:
@@ -18,7 +18,13 @@ class BraveSearcher:
         if not self.api_key:
             _safe_print("[Brave] 未配置 API Key，Brave 搜索功能已禁用。")
 
-    def search_hot_trends(self, query: str, max_results: int = 4, **kwargs) -> List[Dict]:
+    def search_hot_trends(
+        self,
+        query: str,
+        max_results: int = 4,
+        tool_runner: Optional[Callable[..., Any]] = None,
+        **kwargs,
+    ) -> List[Dict]:
         if not self.api_key:
             return []
 
@@ -35,15 +41,24 @@ class BraveSearcher:
             if kwargs:
                 tool_args.update(kwargs)
 
-            raw_res = asyncio.run(
-                call_mcp_tool(
+            if tool_runner is not None:
+                raw_res = tool_runner(
                     command="npx",
                     args=["-y", "@brave/brave-search-mcp-server"],
                     env=env,
                     tool_name="brave_llm_context",
-                    tool_args=tool_args
+                    tool_args=tool_args,
                 )
-            )
+            else:
+                raw_res = asyncio.run(
+                    call_mcp_tool(
+                        command="npx",
+                        args=["-y", "@brave/brave-search-mcp-server"],
+                        env=env,
+                        tool_name="brave_llm_context",
+                        tool_args=tool_args
+                    )
+                )
             
             data = json.loads(raw_res)
             generic_items = data.get("grounding", {}).get("generic", [])

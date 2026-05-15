@@ -16,6 +16,7 @@ PROMPT_BLOCK_TAGS = (
     'stage_7_reader_review_and_commercial_revision',
     'stage_8_evidence_exit_gate',
     'stage_9_chapter_navigation_script',
+    'qa_acceptance_parallel',
 )
 
 
@@ -995,6 +996,53 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
     <check>本章爽点是否写成可见后果？</check>
   </quality_gate>
 </stage_9_chapter_navigation_script>""",
+    'qa_acceptance_parallel': """<qa_acceptance_parallel>
+  <task>
+    基于第7步、第8步、第9步的产物执行并行验收。
+    你不是默认放行器。
+    如果证据不足、章尾钩子不足、或者仍有明显污染，直接判定不通过。
+  </task>
+
+  <input>
+    <stage_7_output>
+      【粘贴第7步输出】
+    </stage_7_output>
+    <stage_8_output>
+      【粘贴第8步输出】
+    </stage_8_output>
+    <stage_9_output>
+      【粘贴第9步输出】
+    </stage_9_output>
+    <chapter_text_preview>
+      【当前章节正文预览】
+    </chapter_text_preview>
+  </input>
+
+  <checks>
+    <check>是否存在明确的放行或不放行依据</check>
+    <check>是否仍有章尾钩子</check>
+    <check>是否有可见制度后果</check>
+    <check>是否存在主角越权</check>
+    <check>是否仍有AI腔或空话</check>
+  </checks>
+
+  <output_format>
+    <qa_acceptance_parallel>
+      <summary></summary>
+      <status>pass / risk / fail</status>
+      <decision>放行 / 带风险放行 / 不放行</decision>
+      <risk_points>
+        <item></item>
+      </risk_points>
+      <required_actions>
+        <item></item>
+      </required_actions>
+      <evidence>
+        <item></item>
+      </evidence>
+    </qa_acceptance_parallel>
+  </output_format>
+</qa_acceptance_parallel>""",
 }
 
 

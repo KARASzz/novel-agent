@@ -1,5 +1,4 @@
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
 
 from rag_engine.search_aggregator import SearchAggregator
 
@@ -9,18 +8,25 @@ def test_brave_searcher_maps_results(monkeypatch):
     # 清空所有 Brave API key 环境变量
     monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
     monkeypatch.delenv("BRAVE_API_KEY", raising=False)
-    
-    # 设置测试用的 API key
     monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "brave-key")
-    
-    # Mock MCP 调用返回的数据
-    fake_mcp_response = '''{"grounding": {"generic": [{"title": "番茄爆款", "snippets": ["追读钩子和爽点节奏"], "url": "https://example.test/a"}]}}'''
 
-    with patch("rag_engine.brave_search.asyncio.run") as mock_run:
-        mock_run.return_value = fake_mcp_response
-        
-        from rag_engine.brave_search import BraveSearcher
-        results = BraveSearcher(api_key="brave-key").search_hot_trends("都市异能", max_results=3)
+    fake_mcp_response = (
+        '{"grounding": {"generic": ['
+        '{"title": "番茄爆款", "snippets": ["追读钩子和爽点节奏"], "url": "https://example.test/a"}'
+        ']}}'
+    )
+
+    def fake_runner(**kwargs):
+        assert kwargs["tool_name"] == "brave_llm_context"
+        assert "都市异能" in kwargs["tool_args"]["query"]
+        return fake_mcp_response
+
+    from rag_engine.brave_search import BraveSearcher
+    results = BraveSearcher(api_key="brave-key").search_hot_trends(
+        "都市异能",
+        max_results=3,
+        tool_runner=fake_runner,
+    )
 
     assert len(results) == 1
     assert results[0]["title"] == "番茄爆款"

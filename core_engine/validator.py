@@ -110,12 +110,12 @@ class FanqieChapterValidator:
         expected_characters = expected_characters or []
         missing_characters = [name for name in expected_characters if name and name not in text]
         if missing_characters:
-            warnings.append(f"预期人物未显化: {', '.join(missing_characters)}")
+            warnings.append(f"设定连续性风险: 预期人物未显化 {', '.join(missing_characters)}")
 
         required_setting_terms = required_setting_terms or []
         missing_settings = [term for term in required_setting_terms if term and term not in text]
         if missing_settings:
-            warnings.append(f"关键设定词缺失: {', '.join(missing_settings)}")
+            warnings.append(f"设定连续性风险: 关键设定词缺失 {', '.join(missing_settings)}")
 
         # 风格指标
         ai_tone_count = self._count_patterns(text, self.AI_TONE_PATTERNS)
@@ -124,22 +124,33 @@ class FanqieChapterValidator:
         paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
         long_paragraphs = [p for p in paragraphs if len(p) > self.long_paragraph_limit]
 
-        # 硬错误判定：AI腔超标、缺少章尾钩子、人物未显化、设定词缺失都视为严重问题
-        hard_errors: List[str] = []
         if ai_tone_count > self.ai_tone_limit:
-            hard_errors.append(f"AI腔超标({ai_tone_count}>{self.ai_tone_limit})")
+            warnings.append(f"AI腔风险: {ai_tone_count} 处，超过上限 {self.ai_tone_limit}")
+
+        conflict_progression = conflict_signals > 0
+        payoff_externalized = payoff_signals > 0
+        setting_continuity = not missing_settings
+
+        # 硬错误判定：冲突、爽点、章尾钩子、人物显化、设定连续性、AI腔都不能空着
+        hard_errors: List[str] = []
+        if not conflict_progression:
+            hard_errors.append("冲突推进不足")
+        if not payoff_externalized:
+            hard_errors.append("爽点外化不足")
         if not ending_hook_signals:
             hard_errors.append("章尾追读钩子不足")
+        if ai_tone_count > self.ai_tone_limit:
+            hard_errors.append(f"AI腔超标({ai_tone_count}>{self.ai_tone_limit})")
         if missing_characters:
-            hard_errors.append(f"预期人物未显化")
+            hard_errors.append(f"预期人物未显化: {', '.join(missing_characters)}")
         if missing_settings:
-            hard_errors.append("关键设定词缺失")
+            hard_errors.append(f"关键设定词缺失: {', '.join(missing_settings)}")
         
         # 把硬错误合并到 errors，确保 is_pass 会考虑这些因素
         errors.extend(hard_errors)
         
         # 硬错误存在时不能通过
-        word_count_ok = word_count >= (self.min_words * 0.7)
+        word_count_ok = word_count >= self.min_words
         is_pass = word_count_ok and not hard_errors
         
         # 启发式总分 (仅供仪表盘参考)
@@ -151,13 +162,17 @@ class FanqieChapterValidator:
         if long_paragraphs: heuristic_score -= 5
         
         checks = {
-            "word_count_ok": word_count >= self.min_words,
+            "word_count_ok": word_count_ok,
             "opening_continuity": opening_continuity,
             "conflict_signals": conflict_signals,
+            "conflict_progression": conflict_progression,
             "payoff_signals": payoff_signals,
+            "payoff_externalized": payoff_externalized,
             "ending_hook": ending_hook_signals,
             "character_check": not missing_characters,
+            "setting_continuity": setting_continuity,
             "style_ai_tone_count": ai_tone_count,
+            "style_abstract_count": abstract_count,
             "style_long_paragraphs": len(long_paragraphs),
         }
 

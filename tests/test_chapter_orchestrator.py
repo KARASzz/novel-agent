@@ -64,6 +64,7 @@ def test_stage_6_tasks_are_never_parallel():
     qa_task = next(task for task in plan.tasks if task.task_id == "qa_acceptance_parallel")
     assert qa_task.execution_mode == ExecutionMode.PARALLEL
     assert qa_task.can_run_parallel is True
+    assert qa_task.prompt_block == "qa_acceptance_parallel"
 
 
 def test_plan_validation_rejects_parallel_stage_6():
