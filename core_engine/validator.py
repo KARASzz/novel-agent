@@ -124,9 +124,23 @@ class FanqieChapterValidator:
         paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
         long_paragraphs = [p for p in paragraphs if len(p) > self.long_paragraph_limit]
 
-        # 现在的评分逻辑：不再暴力扣分，而是基于“是否存在严重物理缺失”和“基本合规性”
-        # 真正的质量交给后续的 LLM 对抗验证。
-        is_pass = not errors and word_count >= (self.min_words * 0.7)
+        # 硬错误判定：AI腔超标、缺少章尾钩子、人物未显化、设定词缺失都视为严重问题
+        hard_errors: List[str] = []
+        if ai_tone_count > self.ai_tone_limit:
+            hard_errors.append(f"AI腔超标({ai_tone_count}>{self.ai_tone_limit})")
+        if not ending_hook_signals:
+            hard_errors.append("章尾追读钩子不足")
+        if missing_characters:
+            hard_errors.append(f"预期人物未显化")
+        if missing_settings:
+            hard_errors.append("关键设定词缺失")
+        
+        # 把硬错误合并到 errors，确保 is_pass 会考虑这些因素
+        errors.extend(hard_errors)
+        
+        # 硬错误存在时不能通过
+        word_count_ok = word_count >= (self.min_words * 0.7)
+        is_pass = word_count_ok and not hard_errors
         
         # 启发式总分 (仅供仪表盘参考)
         heuristic_score = 100

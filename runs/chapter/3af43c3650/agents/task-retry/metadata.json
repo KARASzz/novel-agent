@@ -1,0 +1,12 @@
+{
+  "agent_id": "worker_agent",
+  "agent_level": "WORKER",
+  "task_id": "task-retry",
+  "status": "failed",
+  "error_message": null,
+  "started_at": "2026-05-15T02:32:26.124311+00:00",
+  "ended_at": "2026-05-15T02:32:26.124313+00:00",
+  "execution_time_ms": null,
+  "schema_validated": false,
+  "validation_errors": []
+}

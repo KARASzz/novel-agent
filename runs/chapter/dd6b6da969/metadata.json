@@ -1,0 +1,16 @@
+{
+  "run_id": "dd6b6da969",
+  "run_type": "chapter",
+  "project_id": "test-project",
+  "started_at": "2026-05-15T02:34:19.361953+00:00",
+  "ended_at": "2026-05-15T02:34:19.362738+00:00",
+  "agent_sequence": [
+    "ceo",
+    "manager"
+  ],
+  "completed_tasks": [
+    "task-1",
+    "task-2"
+  ],
+  "failed_tasks": []
+}

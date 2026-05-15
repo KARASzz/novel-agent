@@ -14,6 +14,24 @@ def _workspace_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _load_default_model_slot() -> Optional[str]:
+    """从配置层加载默认模型槽位"""
+    try:
+        from core_engine.config_loader import load_config
+        cfg = load_config()
+        # 优先读取 models.default_slot
+        default_slot = cfg.get("models", {}).get("default_slot")
+        if default_slot:
+            return default_slot
+        # 其次读取 llm.model_slot
+        llm_slot = cfg.get("llm", {}).get("model_slot")
+        if llm_slot:
+            return llm_slot
+    except Exception:
+        pass
+    return None
+
+
 def _resolve_output_path(path_or_dir: str, default_name: str) -> str:
     if path_or_dir.lower().endswith((".json", ".md")):
         os.makedirs(os.path.dirname(os.path.abspath(path_or_dir)) or ".", exist_ok=True)
@@ -116,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
     parser.add_argument("--output", "-o", type=str, help="额外保存 Markdown 报告到指定路径")
     parser.add_argument("--save-bundle", type=str, help="保存 ChapterProductionBundle JSON 到指定目录或文件")
-    parser.add_argument("--model-slot", type=str, help="模型槽位，用于调用大模型生成动态预设")
+    parser.add_argument("--model-slot", type=str, help="模型槽位，用于调用大模型生成动态预设（可省略，将从配置层读取默认值）")
     return parser
 
 
@@ -130,6 +148,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         "mixed": FormatLane.MIXED,
     }[args.format]
 
+    # 解析模型槽位：优先使用命令行参数，其次从配置层读取默认值
+    model_slot = args.model_slot
+    if not model_slot:
+        model_slot = _load_default_model_slot()
+        if model_slot:
+            print(f"[INFO] 未指定 --model-slot，从配置层读取默认槽位: {model_slot}")
+        else:
+            print("[WARNING] 未指定 --model-slot 且配置层无默认值，部分 LLM 生成功能可能受限")
+
     print(f"[Novel Preflight] topic={args.topic}, chapter_form={args.format}, author={args.author}")
     print("=" * 60)
     bundle = PreHubOrchestrator().run(
@@ -137,7 +164,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         format_lane=format_lane,
         author_id=args.author,
         use_rag=not args.no_rag,
-        model_slot=args.model_slot,
+        model_slot=model_slot,
     )
 
     passport = bundle.preflight_passport

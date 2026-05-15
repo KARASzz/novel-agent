@@ -1,0 +1,14 @@
+{
+  "run_id": "736bfff3c3",
+  "run_type": "chapter",
+  "project_id": "test-project",
+  "started_at": "2026-05-15T02:34:19.357759+00:00",
+  "ended_at": "2026-05-15T02:34:19.358701+00:00",
+  "agent_sequence": [
+    "worker_agent"
+  ],
+  "completed_tasks": [],
+  "failed_tasks": [
+    "task-retry"
+  ]
+}

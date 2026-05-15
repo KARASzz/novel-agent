@@ -1,0 +1,12 @@
+{
+  "agent_id": "worker_agent",
+  "agent_level": "WORKER",
+  "task_id": "task-fail-1",
+  "status": "failed",
+  "error_message": "Error",
+  "started_at": "2026-05-15T02:34:19.355209+00:00",
+  "ended_at": "2026-05-15T02:34:19.355211+00:00",
+  "execution_time_ms": null,
+  "schema_validated": false,
+  "validation_errors": []
+}

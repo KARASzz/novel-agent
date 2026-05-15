@@ -248,11 +248,15 @@ class RunAuditor:
         )
         self._execution_records.append(record)
         
-        # 更新运行上下文
+        # 更新运行上下文 - 只根据 status 决定添加到哪个列表
         if agent_id not in self.current_run.agent_sequence:
             self.current_run.agent_sequence.append(agent_id)
-        self.current_run.completed_tasks.append(task_id)
-        if status == "failed":
+        
+        # 只有成功状态才添加到 completed_tasks（且不重复）
+        if status == "completed" and task_id not in self.current_run.completed_tasks:
+            self.current_run.completed_tasks.append(task_id)
+        # 只有失败状态才添加到 failed_tasks（且不重复）
+        elif status == "failed" and task_id not in self.current_run.failed_tasks:
             self.current_run.failed_tasks.append(task_id)
         
         # 落盘文件

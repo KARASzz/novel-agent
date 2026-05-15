@@ -1,0 +1,12 @@
+{
+  "agent_id": "manager_agent",
+  "agent_level": "MANAGER",
+  "task_id": "task-success-1",
+  "status": "completed",
+  "error_message": null,
+  "started_at": "2026-05-15T02:32:26.121312+00:00",
+  "ended_at": "2026-05-15T02:32:26.121314+00:00",
+  "execution_time_ms": null,
+  "schema_validated": false,
+  "validation_errors": []
+}

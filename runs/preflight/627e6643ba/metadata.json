@@ -1,0 +1,18 @@
+{
+  "run_id": "627e6643ba",
+  "run_type": "preflight",
+  "project_id": "test-project",
+  "started_at": "2026-05-15T02:34:19.354620+00:00",
+  "ended_at": "2026-05-15T02:34:19.357230+00:00",
+  "agent_sequence": [
+    "manager_agent",
+    "worker_agent"
+  ],
+  "completed_tasks": [
+    "task-success-1",
+    "task-success-2"
+  ],
+  "failed_tasks": [
+    "task-fail-1"
+  ]
+}

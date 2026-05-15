@@ -1,0 +1,12 @@
+{
+  "agent_id": "ceo",
+  "agent_level": "CEO",
+  "task_id": "task-1",
+  "status": "completed",
+  "error_message": null,
+  "started_at": "2026-05-15T02:32:26.128875+00:00",
+  "ended_at": "2026-05-15T02:32:26.128877+00:00",
+  "execution_time_ms": null,
+  "schema_validated": false,
+  "validation_errors": []
+}

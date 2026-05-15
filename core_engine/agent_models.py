@@ -195,7 +195,12 @@ class AgentResult:
         raw_ref: Optional[str] = None,
         exec_time_ms: Optional[int] = None,
     ) -> AgentResult:
-        """创建成功结果"""
+        """
+        创建成功结果。
+        
+        注意：此方法不会自动校验 artifacts。
+        artifacts 必须通过 validate_artifact_schema() 显式校验后才能进入 validated 状态。
+        """
         result = cls(
             task_id=task_id,
             status=ResultStatus.SUCCESS,
@@ -204,10 +209,8 @@ class AgentResult:
             executed_at=None,
             execution_time_ms=exec_time_ms,
         )
-        # 自动校验所有 artifacts
-        for artifact in artifacts:
-            if artifact.status == ArtifactStatus.PENDING:
-                artifact.mark_validated()
+        # 不再自动校验 artifacts，保持其原有状态
+        # 调用者必须显式调用 validate_artifact_schema() 来校验
         return result
     
     @classmethod

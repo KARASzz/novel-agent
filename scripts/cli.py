@@ -8,6 +8,22 @@ def _get_workspace() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _load_default_model_slot() -> Optional[str]:
+    """从配置层加载默认模型槽位"""
+    try:
+        from core_engine.config_loader import load_config
+        cfg = load_config()
+        default_slot = cfg.get("models", {}).get("default_slot")
+        if default_slot:
+            return default_slot
+        llm_slot = cfg.get("llm", {}).get("model_slot")
+        if llm_slot:
+            return llm_slot
+    except Exception:
+        pass
+    return None
+
+
 def _get_cache_manager(workspace: str):
     from core_engine.cache_manager import CacheManager
 
@@ -106,24 +122,27 @@ def _next_chapter_command(
         model_slot=model_slot or "",
     )
 
-    if not model_slot:
+    if production and not model_slot:
         print("❌ 章节生产必须指定 --model-slot（模板模式已废弃）")
         return 1
 
-    try:
-        from scripts.outline_generator import get_model_credentials
-        from core_engine.llm_client import LLMClient
-        base_url, model_id, api_key = get_model_credentials(model_slot)
-        client = LLMClient(api_key=api_key, base_url=base_url)
-        orchestrator.llm_client = client
-        output = orchestrator.run_chapter(
-            project_goal="番茄小说章节生产",
-            chapter_input=chapter_input,
-            model_id=model_id,
-            output_root=output_root,
-        )
-    except Exception as e:
-        print(f"❌ 章节生产失败: {e}")
+    if production:
+        try:
+            base_url, model_id, api_key = get_model_credentials(model_slot)
+            client = LLMClient(api_key=api_key, base_url=base_url)
+            orchestrator.llm_client = client
+            output = orchestrator.run_chapter(
+                project_goal="番茄小说章节生产",
+                chapter_input=chapter_input,
+                model_id=model_id,
+                output_root=output_root,
+            )
+        except Exception as e:
+            print(f"❌ 章节生产失败: {e}")
+            return 1
+    else:
+        print("❌ 章节生产必须启用 --production 模式")
+        print("   示例: python3 -m scripts.cli next-chapter 第一章 --production --model-slot model_slot_1")
         return 1
 
     print(json.dumps(output.to_dict(), ensure_ascii=False, indent=2))
@@ -166,9 +185,7 @@ def _batch_chapters_command(
             print(f"❌ 批量生产失败: {e}")
             return 1
     else:
-        # 模板模式已废弃，批量章节必须使用 --production + --model-slot
         print("❌ 批量章节生产必须启用 --production 模式并指定 --model-slot")
-        print("   模板模式已废弃。请使用真实 LLM 驱动。")
         print("   示例: python3 -m scripts.cli batch-chapters 第一章 第二章 --production --model-slot model_slot_1")
         return 1
     print(json.dumps([item.to_dict() for item in outputs], ensure_ascii=False, indent=2))
@@ -247,7 +264,7 @@ def build_parser() -> argparse.ArgumentParser:
     new_book_parser.add_argument("--no-rag", action="store_true", help="禁用 Brave/Tavily 搜索聚合，仅使用本地知识库")
     new_book_parser.add_argument("--output", "-o", help="额外保存 Markdown 报告到指定路径")
     new_book_parser.add_argument("--save-bundle", help="保存 ContextBundle JSON 到指定目录或文件")
-    new_book_parser.add_argument("--model-slot", help="模型槽位，用于动态生成剧情钩子")
+    new_book_parser.add_argument("--model-slot", help="模型槽位，用于动态生成剧情钩子（可省略，将从配置层读取默认值）")
 
     full_flow_parser = subparsers.add_parser("full-flow", help="一键立项并全自动生成大纲与设定集")
     full_flow_parser.add_argument("topic", help="项目题材/关键词")
@@ -317,12 +334,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "new-book":
+        model_slot = getattr(args, "model_slot", None)
+        # 对于 new-book，model_slot 可以省略（会从配置层读取默认值）
         return _new_book_command(
             topic=args.topic,
             format_lane=args.format,
             author=args.author,
             no_rag=args.no_rag,
-            model_slot=getattr(args, "model_slot", None),
+            model_slot=model_slot,
             output=args.output,
             save_bundle=args.save_bundle,
         )
