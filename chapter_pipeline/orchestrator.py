@@ -41,6 +41,10 @@ DEFAULT_SIX_B_ROUNDS = (
 # 默认节拍分组（可动态配置）
 DEFAULT_BEAT_GROUPS = ((1, 2), (3, 4), (5, 6))
 
+# 向后兼容别名（旧代码引用）
+BEAT_GROUPS = DEFAULT_BEAT_GROUPS
+SIX_B_ITERATION_ROUNDS = DEFAULT_SIX_B_ROUNDS
+
 
 @dataclass
 class OrchestratorLedger:

@@ -77,8 +77,15 @@ class NovelPreflightOrchestrator:
           - Pydantic PreHubArtifacts
           - context_bundle_for_parser
         """
+        # 如果未指定 model_slot，尝试从环境变量获取默认值
         if not model_slot:
-            raise RuntimeError("model_slot 必须指定。前置评审全程由 LLM 驱动。")
+            import os as _os
+            model_slot = _os.environ.get("NOVEL_AGENT_DEFAULT_MODEL_SLOT", "")
+            if not model_slot:
+                raise RuntimeError(
+                    "model_slot 必须指定。前置评审全程由 LLM 驱动。\n"
+                    "请通过参数传入或设置环境变量 NOVEL_AGENT_DEFAULT_MODEL_SLOT。"
+                )
 
         topic = topic.strip()
         if not topic:
@@ -399,8 +406,21 @@ class NovelPreflightOrchestrator:
             return ""
 
     # ---------------------------------------------------------------------
-    # Step 3: LLM 前置评审
+    # Step 3: LLM 前置评审 (M01-M09 Agent 工序链)
     # ---------------------------------------------------------------------
+
+    # M01-M09 Agent 提示词模板（简化版，实际可扩展为独立 Agent）
+    _AGENT_PROMPTS = {
+        "M01_source_audit": "你是 M01 信源净化 Agent。分析以下来源，输出 source_audit_pack：fact_items、opinion_items、weaknesses。",
+        "M02_market_radar": "你是 M02 市场雷达 Agent。分析 market_context_pack：platform_state_snapshot、lane_heatmap、reader_prior_matrix、risk_heatmap。",
+        "M03_author_memory": "你是 M03 作者记忆校准 Agent。分析 author_memory_pack：strongest_lanes、weakest_lanes、reusable_pattern_pack、anti_pattern_blacklist。",
+        "M04_reader_prior": "你是 M04 读者先验建模 Agent。输出 reader_prior_pack：immune_zone、fatigue_zone、sensitive_zone、integratable_surprise_zone、overload_zone。",
+        "M05_route_decision": "你是 M05 小说赛道分流 Agent。输出 route_decision_pack：content_lane、novel_lane、form_lane。",
+        "M06_concept_arena": "你是 M06 高概念竞技场 Agent。输出 concept_arena_pack：concept_branches、winner_branch_id。",
+        "M07_narrative_seed": "你是 M07 叙事图谱 Agent。输出 narrative_seed_pack：narrative_graph_v1、chapter_hook_chain、writing_brief_v1。",
+        "M08_risk_assessment": "你是 M08 对抗验证 Agent。输出 risk_pack：fatal_flaw_list、rewrite_or_kill_decision。",
+        "M09_preflight_gate": "你是 M09 准入门 Agent。综合所有 pack，输出 preflight_passport：decision、total_score、gate_scores。",
+    }
 
     def _llm_preflight(
         self,
@@ -421,6 +441,7 @@ class NovelPreflightOrchestrator:
         base_url, model_id, api_key = get_model_credentials(model_slot)
         client = LLMClient(api_key=api_key, base_url=base_url)
 
+        # 暂时使用单次调用（未来可扩展为链式 M01-M09）
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(
             topic=topic,

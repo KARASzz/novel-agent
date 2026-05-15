@@ -151,14 +151,14 @@ def _batch_chapters_command(
         try:
             base_url, model_id, api_key = get_model_credentials(model_slot)
             orchestrator.llm_client = LLMClient(api_key=api_key, base_url=base_url)
-            outputs = orchestrator.run_production_batch(
+            outputs = orchestrator.run_batch(
                 project_goal="番茄小说批量生产",
                 chapter_titles=titles,
+                model_id=model_id,
                 project_bundle={"project_id": project_id, "project_title": project_id},
                 initial_previous_writeback=previous_writeback,
                 local_kb_reference="CLI: 批量生产模式下由 Orchestrator 内部维护 RAG。",
                 search_summary="CLI: 批量生产模式下由 Orchestrator 内部维护搜索。",
-                model_id=model_id,
                 output_root=output_root,
                 start_index=start_index,
             )
@@ -166,17 +166,11 @@ def _batch_chapters_command(
             print(f"❌ 批量生产失败: {e}")
             return 1
     else:
-        outputs = orchestrator.run_standard_batch(
-            project_goal="番茄小说批量生产",
-            chapter_titles=titles,
-            project_bundle={"project_id": project_id, "project_title": project_id},
-            initial_previous_writeback=previous_writeback,
-            local_kb_reference="CLI: 使用本地知识库与搜索摘要占位。",
-            search_summary="CLI: 搜索摘要占位。",
-            output_root=output_root,
-            model_slot=model_slot or "",
-            start_index=start_index,
-        )
+        # 模板模式已废弃，批量章节必须使用 --production + --model-slot
+        print("❌ 批量章节生产必须启用 --production 模式并指定 --model-slot")
+        print("   模板模式已废弃。请使用真实 LLM 驱动。")
+        print("   示例: python3 -m scripts.cli batch-chapters 第一章 第二章 --production --model-slot model_slot_1")
+        return 1
     print(json.dumps([item.to_dict() for item in outputs], ensure_ascii=False, indent=2))
     return 0
 

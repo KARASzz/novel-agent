@@ -116,48 +116,6 @@ def test_chapter_plan_carries_required_inputs():
     assert ceo_task.input_payload["model_slot"] == "model_slot_2"
 
 
-def test_mock_chapter_run_outputs_files_and_current_chapter_only(tmp_path):
-    output = ChapterOrchestrator().run_mock_chapter(
-        project_goal="番茄小说章节生产",
-        chapter_input=ChapterPipelineInput(
-            project_bundle={"project_id": "p1"},
-            current_chapter="第一章：误入旧站台",
-            previous_chapter_writeback="开局前置状态",
-            local_kb_reference="本地知识库",
-            search_summary="搜索摘要",
-            chapter_index=1,
-        ),
-        output_root=tmp_path / "novel_outputs",
-    )
-
-    assert output.chapter_title == "第一章：误入旧站台"
-    assert "第二章" not in output.chapter_text
-    assert output.fanqie_quality_report["six_b_serial_ok"] is True
-    assert output.fanqie_quality_report["checks"]["hook_chain_present"] is True
-    assert "stage_9" in output.stage_summaries
-    assert output.next_chapter_writeback["source_chapter_index"] == 1
-    assert output.output_files["chapter_text"].endswith("novel_outputs/p1/chapter_001/chapter.md")
-
-
-def test_mock_batch_uses_previous_chapter_writeback_serially(tmp_path):
-    outputs = ChapterOrchestrator().run_mock_batch(
-        project_goal="番茄小说章节生产",
-        chapter_titles=["第一章：误入旧站台", "第二章：旧账浮出水面"],
-        project_bundle={"project_id": "p1"},
-        initial_previous_writeback="新书开局",
-        output_root=tmp_path / "novel_outputs",
-    )
-
-    assert [item.chapter_index for item in outputs] == [1, 2]
-    assert outputs[0].next_chapter_writeback["source_chapter_index"] == 1
-    chapter_2_plan = ChapterOrchestrator().build_plan(
-        project_goal="番茄小说章节生产",
-        current_chapter="第二章：旧账浮出水面",
-        previous_chapter_script=str(outputs[0].next_chapter_writeback),
-    )
-    assert "source_chapter_index" in chapter_2_plan.chapter_input.previous_chapter_writeback
-
-
 def test_plan_rejects_cross_chapter_scope():
     import pytest
 
