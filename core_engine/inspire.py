@@ -7,10 +7,12 @@ from core_engine.config_loader import load_config, resolve_model_config
 from core_engine.logger import get_logger
 from core_engine.utils import get_enabled_tools
 from core_engine.llm_client import LLMClient
+from core_engine.runtime_env import bootstrap_runtime_environment
 
 logger = get_logger(__name__)
 
 def main():
+    bootstrap_runtime_environment()
     if len(sys.argv) < 2:
         print("用法: python -m core_engine.inspire <小说题材/关键词>")
         sys.exit(1)

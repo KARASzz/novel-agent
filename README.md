@@ -46,15 +46,18 @@
 ```bash
 # 推荐使用 Python 3.11+
 python -m pip install -e .
+# 这会一并安装 uvicorn[standard]，热刷新依赖会自动就位
 ```
 
 ### 2. 配置环境变量
 所有的模型 Key 和搜索 Key 都可以且仅可以通过环境变量注入：
 
 ```powershell
-# 模型 API Key（按你的配置文件设置）
-$env:MODEL_SLOT_1_API_KEY="sk-..."
-$env:MODEL_SLOT_2_API_KEY="sk-..."
+# 模型 API Key（按当前槽位映射设置）
+# model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M2.7
+$env:MINIMAX_API_KEY="sk-..."
+# model_slot_2 -> DASHSCOPE_API_KEY -> kimi-k2.6
+$env:DASHSCOPE_API_KEY="sk-..."
 
 # 在线搜索 API Key（可选）
 $env:TAVILY_API_KEY="..."

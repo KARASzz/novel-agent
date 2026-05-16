@@ -1335,6 +1335,7 @@
             document.getElementById('lastRun').textContent = `执行中: ${cmd}`;
             outputBox.textContent = `[System] 正在启动任务: ${cmd}\n[ModelSlot] ${modelSlot}\n`;
 
+            let commandFailed = false;
             try {
                 const response = await fetch(`/api/run/${cmd}`, {
                     method: 'POST',
@@ -1345,12 +1346,25 @@
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.includes("application/json")) {
                     const result = await response.json();
-                    outputBox.textContent += `\n[Result]\n${result.output}`;
+                    const renderedOutput = typeof result.output === 'string'
+                        ? result.output
+                        : JSON.stringify(result.output ?? result, null, 2);
+                    outputBox.textContent += `\n[Result]\n${renderedOutput}`;
+                    if (!response.ok || result.ok === false) {
+                        commandFailed = true;
+                        const errorText = result.error || result.detail || result.traceback || `HTTP ${response.status}`;
+                        outputBox.textContent += `\n[Error]\n${errorText}`;
+                        indicatorStatus.textContent = '执行失败';
+                    }
                     indicator.classList.remove('active');
                 } else {
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder("utf-8");
                     let stepCount = 0;
+                    if (!response.ok) {
+                        commandFailed = true;
+                        outputBox.textContent += `\n[HTTP ${response.status}]`;
+                    }
                     outputBox.textContent += `\n[Result]\n`;
                     while (true) {
                         const { done, value } = await reader.read();
@@ -1358,6 +1372,13 @@
                         const chunk = decoder.decode(value, { stream: true });
                         outputBox.textContent += chunk;
                         outputBox.scrollTop = outputBox.scrollHeight;
+                        if (chunk.includes('[CommandError]')) {
+                            commandFailed = true;
+                        }
+                        const exitMatch = chunk.match(/\[CommandExit\]\s*code=(-?\d+)/);
+                        if (exitMatch && Number(exitMatch[1]) !== 0) {
+                            commandFailed = true;
+                        }
 
                         // 动态进度条：捕捉 Orchestrator 日志
                         if (chunk.includes('Running Task:')) {
@@ -1370,11 +1391,16 @@
                     indicator.classList.remove('active');
                 }
                 
-                document.getElementById('lastRun').textContent = `完成: ${cmd}`;
+                document.getElementById('lastRun').textContent = commandFailed ? `失败: ${cmd}` : `完成: ${cmd}`;
+                if (commandFailed) {
+                    indicatorStatus.textContent = '执行失败';
+                }
                 await loadGeneratedFiles();
             } catch (error) {
                 outputBox.textContent += `\n[Error] 请求失败: ${error}`;
                 document.getElementById('lastRun').textContent = `失败: ${cmd}`;
+                indicatorStatus.textContent = '执行失败';
+                indicator.classList.remove('active');
             }
         }
 

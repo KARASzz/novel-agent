@@ -4,11 +4,13 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from core_engine.llm_client import LLMClient
 from core_engine.config_loader import load_config
+from core_engine.runtime_env import bootstrap_runtime_environment
 
 def _get_workspace() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def get_model_credentials(slot_name: str) -> tuple[str, str, str]:
+    bootstrap_runtime_environment()
     cfg = load_config()
     slots = cfg.get("models", {}).get("slots", {})
     slot_cfg = slots.get(slot_name, {})

@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 from typing import List, Dict
 from rag_engine.mcp_client import call_mcp_tool
+from core_engine.runtime_env import bootstrap_runtime_environment
 
 def _safe_print(message: str) -> None:
     try:
@@ -29,6 +30,7 @@ class TavilySearcher:
     专门用于扫描番茄小说与网文市场的最新爆款题材、追读钩子和平台规则。
     """
     def __init__(self, api_key: str = None):
+        bootstrap_runtime_environment()
         self.api_key = api_key or os.environ.get("TAVILY_API_KEY")
         self.last_status: str = "idle"
         self.last_error: str = ""
@@ -62,7 +64,13 @@ class TavilySearcher:
 
             raw_res = _call_mcp_tool_sync(
                 command="npx",
-                args=["-y", "mcp-remote", f"https://mcp.tavily.com/mcp/?tavilyApiKey={self.api_key}"],
+                args=[
+                    "-y",
+                    "mcp-remote",
+                    "https://mcp.tavily.com/mcp/",
+                    "--header",
+                    f"Authorization: Bearer {self.api_key}",
+                ],
                 env=os.environ.copy(),
                 tool_name="tavily_search",
                 tool_args=tool_args,

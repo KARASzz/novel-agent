@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 from typing import Any, Callable, Dict, List, Optional
 from rag_engine.mcp_client import call_mcp_tool
+from core_engine.runtime_env import bootstrap_runtime_environment
 
 def _safe_print(message: str) -> None:
     try:
@@ -26,6 +27,7 @@ class BraveSearcher:
     """Brave Web Search adapter using MCP tools."""
 
     def __init__(self, api_key: Optional[str] = None):
+        bootstrap_runtime_environment()
         self.api_key = api_key or os.environ.get("BRAVE_SEARCH_API_KEY") or os.environ.get("BRAVE_API_KEY")
         self.last_status: str = "idle"
         self.last_error: str = ""

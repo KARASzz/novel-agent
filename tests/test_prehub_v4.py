@@ -1,5 +1,6 @@
 import pytest
 
+from pre_hub.adapters.novel_payload_to_bundle import _normalize_token_budget_plan
 from pre_hub.ltm import LTMClient, LTMGovernance, LTMShadowStore
 from pre_hub.pre_hub import PreHubOrchestrator
 from pre_hub.schemas.pre_hub_models import FormatLane, MemoryCandidatePack, MemoryType, ReviewState
@@ -105,3 +106,20 @@ def test_shadow_store_reads_candidates(tmp_path):
 
     assert len(loaded) == 1
     assert loaded[0].candidate_id == "c1"
+
+
+def test_token_budget_plan_sanitizer_drops_note_and_keeps_numbers():
+    plan = _normalize_token_budget_plan(
+        {
+            "prehub_injection_chars": "5000",
+            "rag_context_chars": 3000,
+            "draft_chars": "12000",
+            "note": "本轮token消耗为无穷大时需重新计算",
+        }
+    )
+
+    assert plan == {
+        "prehub_injection_chars": 5000,
+        "rag_context_chars": 3000,
+        "draft_chars": 12000,
+    }

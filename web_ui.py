@@ -1,5 +1,6 @@
 import json
 import re
+import traceback
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -10,7 +11,8 @@ import sys
 import asyncio
 from typing import Any, Callable, Dict, List, Optional
 
-from core_engine.config_loader import load_config
+from core_engine.config_loader import load_config, resolve_model_config
+from core_engine.runtime_env import bootstrap_runtime_environment, describe_runtime_environment
 from web_file_catalog import GeneratedFileCatalog
 
 try:
@@ -59,6 +61,93 @@ REMOVED_LEGACY_FLOW_FILES = (
     "core_engine/parser_prompts/chapter_parser_prompt.txt",
     "core_engine/parser_prompts/episode_parser_prompt.txt",
 )
+
+REQUIRED_RUNTIME_ENV_VARS = (
+    "MINIMAX_API_KEY",
+    "TAVILY_API_KEY",
+    "BRAVE_SEARCH_API_KEY",
+)
+
+MODEL_COMMANDS = {
+    "preflight",
+    "full_flow",
+    "produce_chapter",
+    "batch_produce",
+    "feed",
+    "inspire",
+}
+
+SEARCH_COMMANDS = {"feed", "inspire"}
+
+
+def _command_result(
+    *,
+    ok: bool,
+    output: str = "",
+    error: str = "",
+    command: str = "",
+    **extra: Any,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "ok": ok,
+        "output": output,
+    }
+    if command:
+        payload["command"] = command
+    if error:
+        payload["error"] = error
+    payload.update(extra)
+    return payload
+
+
+def _validate_model_command(command: str, selected_model_slot: str) -> Optional[Dict[str, Any]]:
+    if command not in MODEL_COMMANDS:
+        return None
+
+    cfg = load_config()
+    model_cfg = resolve_model_config(cfg, selected_model_slot or None)
+    slot_name = str(model_cfg.get("slot_name") or selected_model_slot or "")
+    base_url = str(model_cfg.get("base_url") or "").strip()
+    model_id = str(model_cfg.get("model_id") or "").strip()
+    api_key_env = str(model_cfg.get("api_key_env") or "").strip()
+    bootstrap_runtime_environment(
+        [name for name in (api_key_env, "TAVILY_API_KEY", "BRAVE_SEARCH_API_KEY") if name]
+    )
+
+    missing_fields = [
+        field
+        for field, value in (
+            ("base_url", base_url),
+            ("model_id", model_id),
+            ("api_key_env", api_key_env),
+        )
+        if not value
+    ]
+    missing_env: List[str] = []
+    if api_key_env and not os.environ.get(api_key_env):
+        missing_env.append(api_key_env)
+    if command in SEARCH_COMMANDS and not os.environ.get("TAVILY_API_KEY"):
+        missing_env.append("TAVILY_API_KEY")
+
+    if missing_fields or missing_env:
+        detail_parts = []
+        if missing_fields:
+            detail_parts.append("配置缺项: " + ", ".join(missing_fields))
+        if missing_env:
+            detail_parts.append("缺少环境变量: " + ", ".join(missing_env))
+        detail_parts.append(f"当前槽位: {slot_name} -> {api_key_env or 'unknown_env'} -> {model_id or 'unknown_model'}")
+        return _command_result(
+            ok=False,
+            command=command,
+            error="; ".join(detail_parts),
+            missing_fields=missing_fields,
+            missing_env=missing_env,
+            model_slot=slot_name,
+            model_id=model_id,
+            api_key_env=api_key_env,
+        )
+
+    return None
 
 
 def _latest_execution_plan_path() -> Optional[Path]:
@@ -260,6 +349,14 @@ def _initialization_self_check_payload() -> Dict[str, Any]:
             "errors": [str(exc)],
             "warnings": [],
         }
+
+    bootstrap_runtime_environment(REQUIRED_RUNTIME_ENV_VARS)
+    runtime_env_status = describe_runtime_environment(REQUIRED_RUNTIME_ENV_VARS)
+    missing_runtime_env = [item["name"] for item in runtime_env_status if item["status"] == "missing"]
+    if missing_runtime_env:
+        add_check("运行时环境变量", "fail", "缺失: " + ", ".join(missing_runtime_env))
+    else:
+        add_check("运行时环境变量", "pass", "MINIMAX_API_KEY、TAVILY_API_KEY、BRAVE_SEARCH_API_KEY 均可读取。")
 
     registry = cfg.get("models", {})
     slots = registry.get("slots", {}) if isinstance(registry.get("slots"), dict) else {}
@@ -505,6 +602,7 @@ async def run_command(command: str, request: Request):
         payload = {}
     selected_model_slot = str(payload.get("model_slot") or "").strip()
     topic = str(payload.get("topic") or "test_demo").strip()
+    bootstrap_runtime_environment()
     py = sys.executable or "python"
     env = os.environ.copy()
     env.setdefault("PYTHONIOENCODING", "utf-8")
@@ -525,7 +623,7 @@ async def run_command(command: str, request: Request):
     # 移除空参数，防止出现 --model-slot (empty) --production 导致 production 被误读为 model_slot 的值
     for k in cmd_map:
         cmd_map[k] = [arg for arg in cmd_map[k] if arg != ""]
-    
+
     if command == "exit":
         # Start background task to kill process so the response still returns
         import threading
@@ -535,19 +633,33 @@ async def run_command(command: str, request: Request):
             time.sleep(0.5)
             os.kill(os.getpid(), signal.SIGTERM)
         threading.Thread(target=shutdown).start()
-        return {"output": "正在关闭网页控制台服务，请关闭此浏览器标签页。"}
-    
+        return _command_result(ok=True, output="正在关闭网页控制台服务，请关闭此浏览器标签页。", command=command)
+
     if command in INTERNAL_COMMANDS:
         try:
-            return {"output": INTERNAL_COMMANDS[command](selected_model_slot)}
+            return _command_result(
+                ok=True,
+                output=INTERNAL_COMMANDS[command](selected_model_slot),
+                command=command,
+            )
         except Exception as exc:
-            return {"output": f"执行异常: {str(exc)}"}
+            return _command_result(
+                ok=False,
+                output="",
+                error=str(exc) or exc.__class__.__name__,
+                traceback=traceback.format_exc(),
+                command=command,
+            )
 
     if command not in cmd_map:
-        return {"output": "未知命令"}
+        return _command_result(ok=False, output="未知命令", error="未知命令", command=command)
+
+    validation_error = _validate_model_command(command, selected_model_slot)
+    if validation_error is not None:
+        return validation_error
 
     cmd = list(cmd_map[command])
-    
+
     import subprocess
     # Use StreamingResponse for shell commands to show real-time progress
     async def process_stream():
@@ -557,22 +669,51 @@ async def run_command(command: str, request: Request):
                 cwd=BASE_DIR,
                 env=env,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT
+                stderr=subprocess.PIPE,
             )
-            
-            if process.stdout is None:
-                yield "错误: 子进程未能建立 stdout 管道。\n"
+
+            if process.stdout is None or process.stderr is None:
+                yield "[CommandError] 子进程未能建立 stdout/stderr 管道。\n"
                 return
-                
-            while True:
-                chunk = await process.stdout.read(1024)
-                if not chunk:
-                    break
-                yield chunk.decode("utf-8", errors="replace")
-            await process.wait()
-            yield f"\n命令执行完成 (退出码: {process.returncode})\n"
+
+            queue: asyncio.Queue[tuple[str, Optional[str]]] = asyncio.Queue()
+
+            async def pump(stream: asyncio.StreamReader, label: str) -> None:
+                try:
+                    while True:
+                        chunk = await stream.read(1024)
+                        if not chunk:
+                            break
+                        await queue.put((label, chunk.decode("utf-8", errors="replace")))
+                except Exception as exc:
+                    await queue.put(("stderr", f"[CommandError] 读取 {label} 失败: {exc}\n"))
+                finally:
+                    await queue.put((label, None))
+
+            pumps = [
+                asyncio.create_task(pump(process.stdout, "stdout")),
+                asyncio.create_task(pump(process.stderr, "stderr")),
+            ]
+            finished_streams = 0
+            try:
+                while finished_streams < 2:
+                    label, text = await queue.get()
+                    if text is None:
+                        finished_streams += 1
+                        continue
+                    if label == "stderr":
+                        yield f"[stderr] {text}"
+                    else:
+                        yield text
+                await process.wait()
+                yield f"\n[CommandExit] code={process.returncode}\n"
+            finally:
+                for task in pumps:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*pumps, return_exceptions=True)
         except Exception as e:
-            yield f"\n执行异常: {str(e)}\n"
+            yield f"\n[CommandError] {traceback.format_exc()}\n"
             
     return StreamingResponse(process_stream(), media_type="text/plain")
 
@@ -580,6 +721,15 @@ if __name__ == "__main__":
     import threading
     import webbrowser
     import time
+
+    bootstrap_runtime_environment(REQUIRED_RUNTIME_ENV_VARS)
+    runtime_env_status = describe_runtime_environment(REQUIRED_RUNTIME_ENV_VARS)
+    loaded_env = ", ".join(
+        f"{item['name']}({item['source']})"
+        for item in runtime_env_status
+        if item["status"] == "present"
+    )
+    missing_env = ", ".join(item["name"] for item in runtime_env_status if item["status"] == "missing")
     
     def open_browser():
         time.sleep(1.5)
@@ -588,4 +738,7 @@ if __name__ == "__main__":
     threading.Thread(target=open_browser, daemon=True).start()
     
     print("启动番茄小说网页控制台（Jinja2 auto_reload + uvicorn reload）...")
+    print(f"[EnvCheck] 已注入: {loaded_env or '无'}")
+    if missing_env:
+        print(f"[EnvCheck] 缺少: {missing_env}")
     uvicorn.run("web_ui:app", host="127.0.0.1", port=8543, reload=True)

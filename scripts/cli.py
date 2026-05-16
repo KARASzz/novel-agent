@@ -1,7 +1,19 @@
 import argparse
 import json
 import os
+import sys
 from typing import Optional, Sequence
+
+from core_engine.runtime_env import bootstrap_runtime_environment
+
+
+def _configure_stdio() -> None:
+    """Force UTF-8 output so Windows console commands don't crash on Unicode."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 
 def _get_workspace() -> str:
@@ -193,6 +205,7 @@ def _batch_chapters_command(
 
 
 def _search_diagnose_command(query: str, max_results: int) -> int:
+    bootstrap_runtime_environment()
     from rag_engine.search_aggregator import SearchAggregator
 
     payload = SearchAggregator(local_kb_dir=os.path.join(_get_workspace(), "knowledge_base")).search(
@@ -330,6 +343,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    _configure_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
 

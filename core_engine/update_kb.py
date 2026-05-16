@@ -7,6 +7,7 @@ from rag_engine.tavily_search import TavilySearcher
 from core_engine.config_loader import load_config, resolve_model_config
 from core_engine.logger import get_logger
 from core_engine.llm_client import LLMClient
+from core_engine.runtime_env import bootstrap_runtime_environment
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ def _configure_stdio() -> None:
 
 
 def main():
+    bootstrap_runtime_environment()
     _configure_stdio()
 
     if len(sys.argv) < 2:

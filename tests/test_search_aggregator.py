@@ -94,6 +94,13 @@ def test_tavily_searcher_maps_results_without_include_answer(monkeypatch):
     assert captured["tool_name"] == "tavily_search"
     assert "include_answer" not in captured["tool_args"]
     assert "search_depth" in captured["tool_args"]
+    assert captured["args"] == [
+        "-y",
+        "mcp-remote",
+        "https://mcp.tavily.com/mcp/",
+        "--header",
+        "Authorization: Bearer tavily-key",
+    ]
     assert results[0]["title"] == "番茄热榜"
     assert results[0]["content"] == "追读钩子和爆点节奏"
     assert results[0]["url"] == "https://example.test/t"

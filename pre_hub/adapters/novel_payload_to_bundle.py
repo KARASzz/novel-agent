@@ -37,6 +37,27 @@ from pre_hub.schemas.pre_hub_models import (
 )
 
 
+def _normalize_token_budget_plan(raw_plan: Any) -> Dict[str, int]:
+    """Keep only integer budget fields and drop free-form notes."""
+    if not isinstance(raw_plan, dict):
+        return {}
+
+    normalized: Dict[str, int] = {}
+    for key, value in raw_plan.items():
+        if key == "note":
+            continue
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            normalized[str(key)] = value
+            continue
+        try:
+            normalized[str(key)] = int(str(value).strip())
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return normalized
+
+
 def novel_payload_to_bundle(payload: Dict[str, Any]) -> ChapterProductionBundle:
     """转换核心逻辑。"""
     meta = payload.get("_meta", {})
@@ -219,7 +240,9 @@ def novel_payload_to_bundle(payload: Dict[str, Any]) -> ChapterProductionBundle:
         narrative_seed=narrative,
         risk_pack=risk,
         preflight_passport=passport,
-        token_budget_plan=payload.get("context_bundle_for_parser", {}).get("token_budget_plan", {}),
+        token_budget_plan=_normalize_token_budget_plan(
+            payload.get("context_bundle_for_parser", {}).get("token_budget_plan", {})
+        ),
         fallback_reasons=meta.get("fallback_reasons", []),
     ).seal()
 

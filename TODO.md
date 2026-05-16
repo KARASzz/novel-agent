@@ -154,3 +154,12 @@
 - [x] 默认运行链路只依赖所选 OpenAI Chat Completions 兼容模型、本地知识库，以及可选 Tavily/Brave 搜索。
 - [x] 所选模型缺少 key 时，系统明确提示需要设置该模型槽位绑定的环境变量。
 - [x] 缺少 Tavily 或 Brave key 时，系统可降级到本地知识库，不中断主流程。
+
+## 8. 工作模块按钮回归与环境补齐
+
+- [x] 统一网页控制台启动链路，确保 `MINIMAX_API_KEY`、`TAVILY_API_KEY`、`BRAVE_SEARCH_API_KEY` 这些用户级环境变量在 web 进程里可见，并在启动时显式自检。
+- [x] 改 `web_ui.py` 的 `/api/run/*` 输出处理，保留子进程 `stderr`、退出码和原始异常文本，避免空的 `执行异常:`。
+- [x] 给工作模块按钮分开回显，`preflight`、`full_flow`、`produce_chapter`、`batch_produce`、`feed`、`inspire`、`diag_validator`、`export_fanqie`、`cache` 都有明确成功态和失败态。
+- [x] 固化模型槽位映射，明确 `model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M2.7`，并在按钮执行前验证 `base_url`、`model_id`、`api_key_env` 三项完整。
+- [x] 补齐依赖清单，并把 `tavily-python` 对齐到 `0.7.24+`；`uvicorn[standard]` 热刷新依赖已写入安装说明。
+- [x] 保持 `search_diag` 作为可用基线，不重做搜索策略，只确认 Brave/Tavily 仍能正常调用，本地知识库继续作为补充来源。

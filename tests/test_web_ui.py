@@ -77,9 +77,14 @@ def test_feed_command_uses_current_executable_and_utf8_env(monkeypatch):
                 return b"ok\n"
             return b""
 
+    class FakeStderr:
+        async def read(self, size):
+            return b""
+
     class FakeProcess:
         def __init__(self):
             self.stdout = FakeStdout()
+            self.stderr = FakeStderr()
             self.returncode = 0
 
         async def wait(self):
@@ -90,6 +95,8 @@ def test_feed_command_uses_current_executable_and_utf8_env(monkeypatch):
         captured["kwargs"] = kwargs
         return FakeProcess()
 
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test")
+    monkeypatch.setenv("TAVILY_API_KEY", "tavily-test")
     monkeypatch.setattr(web_ui.sys, "executable", "C:/Python/python.exe")
     monkeypatch.setattr(web_ui.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
 
@@ -111,6 +118,42 @@ def test_feed_command_uses_current_executable_and_utf8_env(monkeypatch):
     assert "ok" in "".join(chunks)
 
 
+def test_preflight_command_reports_missing_model_key(monkeypatch):
+    class FakeRequest:
+        async def json(self):
+            return {"model_slot": "model_slot_1", "topic": "赛博朋克 剑修"}
+
+    monkeypatch.setattr(web_ui, "bootstrap_runtime_environment", lambda *args, **kwargs: {"loaded": [], "missing": []})
+    monkeypatch.setattr(
+        web_ui,
+        "load_config",
+        lambda: {
+            "models": {
+                "default_slot": "model_slot_1",
+                "slots": {
+                    "model_slot_1": {
+                        "display_name": "测试模型",
+                        "base_url": "https://api.minimaxi.com/v1",
+                        "api_key_env": "MINIMAX_API_KEY",
+                        "model_id": "MiniMax-M2.7",
+                        "enabled": True,
+                    }
+                },
+            }
+        },
+    )
+    monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+
+    import asyncio
+
+    payload = asyncio.run(web_ui.run_command("preflight", FakeRequest()))
+
+    assert payload["ok"] is False
+    assert "MINIMAX_API_KEY" in payload["error"]
+    assert payload["missing_env"] == ["MINIMAX_API_KEY"]
+
+
 def test_dashboard_exposes_initialization_self_check_button():
     command_ids = {
         command["id"]
@@ -128,7 +171,9 @@ def test_initialization_self_check_payload_passes_core_checks(monkeypatch, tmp_p
         (templates / name).write_text("# template", encoding="utf-8")
 
     monkeypatch.setattr(web_ui, "BASE_DIR", str(tmp_path))
-    monkeypatch.setenv("MODEL_SLOT_1_API_KEY", "sk-test")
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test")
+    monkeypatch.setenv("TAVILY_API_KEY", "tavily-test")
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "brave-test")
     monkeypatch.setattr(
         web_ui,
         "load_config",
@@ -139,7 +184,7 @@ def test_initialization_self_check_payload_passes_core_checks(monkeypatch, tmp_p
                     "model_slot_1": {
                         "display_name": "测试模型",
                         "base_url": "https://example.test/v1",
-                        "api_key_env": "MODEL_SLOT_1_API_KEY",
+                        "api_key_env": "MINIMAX_API_KEY",
                         "model_id": "model-test",
                         "enabled": True,
                     }

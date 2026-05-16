@@ -33,6 +33,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from core_engine.runtime_env import bootstrap_runtime_environment
+
 
 class NovelPreflightOrchestrator:
     """番茄小说立项中台。LLM 负责评审，Python 只做总线。"""
@@ -78,6 +80,7 @@ class NovelPreflightOrchestrator:
           - context_bundle_for_parser
         """
         # 如果未指定 model_slot，尝试从环境变量获取默认值
+        bootstrap_runtime_environment()
         if not model_slot:
             import os as _os
             model_slot = _os.environ.get("NOVEL_AGENT_DEFAULT_MODEL_SLOT", "")
