@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -49,6 +50,23 @@ class LLMClient:
         )
 
     @staticmethod
+    def _normalize_output_text(text: Any) -> str:
+        if text is None:
+            return ""
+        if not isinstance(text, str):
+            text = str(text)
+
+        # Remove internal reasoning blocks before persisting model output.
+        text = re.sub(r"<think\b[^>]*>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE).strip()
+
+        # If the whole response is wrapped in a single fence, unwrap it.
+        fenced = re.fullmatch(r"```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)\s*```", text)
+        if fenced:
+            text = fenced.group(1).strip()
+
+        return text.strip()
+
+    @staticmethod
     def _extract_output_text(response: Any) -> str:
         choices = getattr(response, "choices", None)
         if choices is None and isinstance(response, dict):
@@ -73,8 +91,8 @@ class LLMClient:
                     parts.append(str(item.get("text") or item.get("content") or ""))
                 else:
                     parts.append(str(item))
-            return "".join(parts)
-        return str(content or "")
+            return LLMClient._normalize_output_text("".join(parts))
+        return LLMClient._normalize_output_text(content or "")
 
     @staticmethod
     def _convert_text_format(text: Any) -> Optional[Dict[str, Any]]:

@@ -60,6 +60,57 @@ def test_web_ui_no_longer_exposes_legacy_pipeline_command(monkeypatch):
     }
 
 
+def test_feed_command_uses_current_executable_and_utf8_env(monkeypatch):
+    class FakeRequest:
+        async def json(self):
+            return {"model_slot": "model_slot_1"}
+
+    captured = {}
+
+    class FakeStdout:
+        def __init__(self):
+            self.calls = 0
+
+        async def read(self, size):
+            self.calls += 1
+            if self.calls == 1:
+                return b"ok\n"
+            return b""
+
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = FakeStdout()
+            self.returncode = 0
+
+        async def wait(self):
+            return 0
+
+    async def fake_create_subprocess_exec(*cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(web_ui.sys, "executable", "C:/Python/python.exe")
+    monkeypatch.setattr(web_ui.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+
+    import asyncio
+
+    async def invoke():
+        response = await web_ui.run_command("feed", FakeRequest())
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(invoke())
+
+    assert captured["cmd"][0] == "C:/Python/python.exe"
+    assert captured["kwargs"]["env"]["PYTHONIOENCODING"] == "utf-8"
+    assert captured["kwargs"]["env"]["PYTHONUTF8"] == "1"
+    assert captured["kwargs"]["cwd"] == web_ui.BASE_DIR
+    assert "ok" in "".join(chunks)
+
+
 def test_dashboard_exposes_initialization_self_check_button():
     command_ids = {
         command["id"]

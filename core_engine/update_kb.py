@@ -10,7 +10,19 @@ from core_engine.llm_client import LLMClient
 
 logger = get_logger(__name__)
 
+
+def _configure_stdio() -> None:
+    """Force UTF-8 output so Windows pipes do not fail on emoji/CJK logs."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def main():
+    _configure_stdio()
+
     if len(sys.argv) < 2:
         print("用法: python -m core_engine.update_kb <需要补充的知识库主题>")
         sys.exit(1)

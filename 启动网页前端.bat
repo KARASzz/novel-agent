@@ -1,13 +1,10 @@
-﻿@echo off
-if "%~1"=="utf8" goto main
+@echo off
+setlocal
 chcp 65001 >nul
-cmd /c "%~f0" utf8
-exit /b
-
-:main
 cd /d "%~dp0"
-title 番茄小说一键制造机 - 网页控制台
-echo 正在启动番茄小说网页控制台 (FastAPI + Jinja2 热刷新)...
-echo 文件清单会在网页右侧显示，点击“本机打开”会用默认应用打开，不走浏览器预览或下载。
-python web_ui.py
-pause
+set "PYTHONUTF8=1"
+set "PYTHONIOENCODING=utf-8"
+title Tomato Novel Web Console
+echo Starting web console with hot reload...
+cmd /c python web_ui.py
+exit /b

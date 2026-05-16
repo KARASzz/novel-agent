@@ -505,7 +505,10 @@ async def run_command(command: str, request: Request):
         payload = {}
     selected_model_slot = str(payload.get("model_slot") or "").strip()
     topic = str(payload.get("topic") or "test_demo").strip()
-    py = "python3"
+    py = sys.executable or "python"
+    env = os.environ.copy()
+    env.setdefault("PYTHONIOENCODING", "utf-8")
+    env.setdefault("PYTHONUTF8", "1")
     # Map API commands to actual python CLI commands
     cmd_map = {
         "preflight": [py, "-m", "scripts.cli", "new-book", topic, "--format", "real", "--model-slot", selected_model_slot],
@@ -552,6 +555,7 @@ async def run_command(command: str, request: Request):
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 cwd=BASE_DIR,
+                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT
             )

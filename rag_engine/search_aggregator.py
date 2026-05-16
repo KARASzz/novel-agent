@@ -37,9 +37,11 @@ class SearchAggregator:
         self,
         merged: List[Dict[str, Any]],
         seen: set[Tuple[str, str]],
-        items: List[Dict[str, Any]],
+        items: Optional[List[Dict[str, Any]]],
         origin: str,
     ) -> None:
+        if items is None:
+            return
         if not items:
             self.fallback_reasons.append(f"{origin}_empty_result")
             return
@@ -57,63 +59,73 @@ class SearchAggregator:
             seen.add(key)
             merged.append(enriched)
 
-    def _search_brave(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _search_brave(self, query: str, max_results: int) -> Optional[List[Dict[str, Any]]]:
         if not self.enable_brave:
             self.fallback_reasons.append("brave_disabled")
-            return []
-        
+            return None
+
         api_key = os.getenv("BRAVE_SEARCH_API_KEY") or os.getenv("BRAVE_API_KEY")
         if not api_key:
             self.fallback_reasons.append("missing_env:BRAVE_SEARCH_API_KEY")
-            return []
+            return None
             
         try:
             from rag_engine.brave_search import BraveSearcher
             print(f"DEBUG: Starting Brave Search for query: {query}")
-            results = BraveSearcher(api_key=api_key).search_hot_trends(
+            searcher = BraveSearcher(api_key=api_key)
+            results = searcher.search_hot_trends(
                 query, 
                 max_results=max_results,
                 **self.brave_params
             )
+            if getattr(searcher, "last_status", "") == "failed":
+                error_type = str(getattr(searcher, "last_error", "") or "unknown_error").split(":", 1)[0]
+                self.fallback_reasons.append(f"brave_failed:{error_type}")
+                return None
             print(f"DEBUG: Brave Search completed, found {len(results)} results")
             return results
         except Exception as exc:
             self.fallback_reasons.append(f"brave_failed:{type(exc).__name__}")
             logger.warning("Brave search failed: %s", exc)
-            return []
+            return None
 
-    def _search_tavily(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _search_tavily(self, query: str, max_results: int) -> Optional[List[Dict[str, Any]]]:
         if not self.enable_tavily:
             self.fallback_reasons.append("tavily_disabled")
-            return []
+            return None
             
         api_key = os.getenv("TAVILY_API_KEY") or os.getenv("TAVILY_SEARCH_API_KEY")
         if not api_key:
             self.fallback_reasons.append("missing_env:TAVILY_API_KEY")
-            return []
+            return None
             
         try:
             from rag_engine.tavily_search import TavilySearcher
             print(f"DEBUG: Starting Tavily Search for query: {query}")
-            results = TavilySearcher(api_key=api_key).search_hot_trends(
+            searcher = TavilySearcher(api_key=api_key)
+            results = searcher.search_hot_trends(
                 query, 
                 max_results=max_results,
                 **self.tavily_params
             )
+            if getattr(searcher, "last_status", "") == "failed":
+                error_type = str(getattr(searcher, "last_error", "") or "unknown_error").split(":", 1)[0]
+                self.fallback_reasons.append(f"tavily_failed:{error_type}")
+                return None
             print(f"DEBUG: Tavily Search completed, found {len(results)} results")
             return results
         except Exception as exc:
             self.fallback_reasons.append(f"tavily_failed:{type(exc).__name__}")
             logger.warning("Tavily search failed: %s", exc)
-            return []
+            return None
 
-    def _search_local(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+    def _search_local(self, query: str, max_results: int) -> Optional[List[Dict[str, Any]]]:
         if not self.enable_local:
             self.fallback_reasons.append("local_kb_disabled")
-            return []
+            return None
         if not self.local_kb_dir or not os.path.isdir(self.local_kb_dir):
             self.fallback_reasons.append("local_kb_missing")
-            return []
+            return None
         try:
             from rag_engine.retriever import LocalRetriever
 
@@ -134,7 +146,7 @@ class SearchAggregator:
         except Exception as exc:
             self.fallback_reasons.append(f"local_kb_failed:{type(exc).__name__}")
             logger.warning("Local knowledge search failed: %s", exc)
-            return []
+            return None
 
     def search(self, query: str, max_results_per_source: int = 4) -> Dict[str, Any]:
         self.fallback_reasons = []

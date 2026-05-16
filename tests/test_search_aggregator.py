@@ -1,4 +1,6 @@
+import asyncio
 from pathlib import Path
+import json
 
 from rag_engine.search_aggregator import SearchAggregator
 
@@ -33,6 +35,101 @@ def test_brave_searcher_maps_results(monkeypatch):
     assert results[0]["content"] == "追读钩子和爽点节奏"
     assert results[0]["url"] == "https://example.test/a"
     assert results[0]["source"] == "brave"
+
+
+def test_brave_searcher_works_inside_running_event_loop(monkeypatch):
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "brave-key")
+
+    fake_mcp_response = (
+        '{"grounding": {"generic": ['
+        '{"title": "番茄爆款", "snippets": ["追读钩子和爽点节奏"], "url": "https://example.test/a"}'
+        ']}}'
+    )
+
+    async def fake_call_mcp_tool(**kwargs):
+        return fake_mcp_response
+
+    monkeypatch.setattr("rag_engine.brave_search.call_mcp_tool", fake_call_mcp_tool)
+
+    from rag_engine.brave_search import BraveSearcher
+
+    async def runner():
+        return BraveSearcher(api_key="brave-key").search_hot_trends("都市异能", max_results=3)
+
+    results = asyncio.run(runner())
+
+    assert len(results) == 1
+    assert results[0]["title"] == "番茄爆款"
+    assert results[0]["source"] == "brave"
+
+
+def test_tavily_searcher_maps_results_without_include_answer(monkeypatch):
+    monkeypatch.setenv("TAVILY_API_KEY", "tavily-key")
+
+    captured = {}
+
+    async def fake_call_mcp_tool(**kwargs):
+        captured.update(kwargs)
+        return json.dumps(
+            {
+                "results": [
+                    {
+                        "title": "番茄热榜",
+                        "content": "追读钩子和爆点节奏",
+                        "url": "https://example.test/t",
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("rag_engine.tavily_search.call_mcp_tool", fake_call_mcp_tool)
+
+    from rag_engine.tavily_search import TavilySearcher
+
+    results = TavilySearcher(api_key="tavily-key").search_hot_trends(
+        "都市异能",
+        max_results=3,
+    )
+
+    assert captured["tool_name"] == "tavily_search"
+    assert "include_answer" not in captured["tool_args"]
+    assert "search_depth" in captured["tool_args"]
+    assert results[0]["title"] == "番茄热榜"
+    assert results[0]["content"] == "追读钩子和爆点节奏"
+    assert results[0]["url"] == "https://example.test/t"
+    assert results[0]["source"] == "tavily"
+    assert results[0]["origin"] == "tavily"
+    assert results[0]["published_at"] == ""
+
+
+def test_tavily_searcher_works_inside_running_event_loop(monkeypatch):
+    monkeypatch.setenv("TAVILY_API_KEY", "tavily-key")
+
+    async def fake_call_mcp_tool(**kwargs):
+        return json.dumps(
+            {
+                "results": [
+                    {
+                        "title": "番茄热榜",
+                        "content": "追读钩子和爆点节奏",
+                        "url": "https://example.test/t",
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr("rag_engine.tavily_search.call_mcp_tool", fake_call_mcp_tool)
+
+    from rag_engine.tavily_search import TavilySearcher
+
+    async def runner():
+        return TavilySearcher(api_key="tavily-key").search_hot_trends("都市异能", max_results=3)
+
+    results = asyncio.run(runner())
+
+    assert len(results) == 1
+    assert results[0]["title"] == "番茄热榜"
+    assert results[0]["origin"] == "tavily"
 
 
 def test_search_aggregator_falls_back_to_local(monkeypatch, tmp_path):
@@ -113,3 +210,21 @@ def test_search_aggregator_handles_partial_results(monkeypatch, tmp_path):
     assert "missing_env:TAVILY_API_KEY" in payload["fallback_reasons"]
     assert payload["results"]
     assert any(r["origin"] == "local" for r in payload["results"])
+
+
+def test_search_aggregator_records_remote_failures(monkeypatch):
+    monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "brave-key")
+    monkeypatch.setenv("TAVILY_API_KEY", "tavily-key")
+
+    async def fake_call_mcp_tool(**kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("rag_engine.brave_search.call_mcp_tool", fake_call_mcp_tool)
+    monkeypatch.setattr("rag_engine.tavily_search.call_mcp_tool", fake_call_mcp_tool)
+
+    payload = SearchAggregator(enable_local=False).search("都市异能")
+
+    assert "brave_failed:RuntimeError" in payload["fallback_reasons"]
+    assert "tavily_failed:RuntimeError" in payload["fallback_reasons"]
+    assert not any(reason.endswith("_empty_result") for reason in payload["fallback_reasons"])
+    assert payload["results"] == []

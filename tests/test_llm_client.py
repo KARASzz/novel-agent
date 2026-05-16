@@ -51,6 +51,32 @@ def test_llm_client_create_response_uses_chat_completions(mock_openai):
 
 
 @patch("core_engine.llm_client.OpenAI")
+def test_llm_client_strips_think_and_outer_fence(mock_openai):
+    mock_chat = MagicMock()
+    mock_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content="<think>internal reasoning</think>\n```markdown\n# test_demo\n\n正文\n```"
+                )
+            )
+        ],
+        usage=None,
+    )
+    mock_chat.completions.create.return_value = mock_response
+    mock_openai.return_value.chat = mock_chat
+
+    client = LLMClient(api_key="sk-test", base_url="http://test.ai")
+    response = client.create_response(
+        model="model-test",
+        instructions="do this",
+        input_text="hello",
+    )
+
+    assert response.output_text == "# test_demo\n\n正文"
+
+
+@patch("core_engine.llm_client.OpenAI")
 def test_llm_client_converts_legacy_text_json_schema(mock_openai):
     mock_chat = MagicMock()
     mock_chat.completions.create.return_value = SimpleNamespace(
