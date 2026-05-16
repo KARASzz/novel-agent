@@ -573,5 +573,15 @@ async def run_command(command: str, request: Request):
     return StreamingResponse(process_stream(), media_type="text/plain")
 
 if __name__ == "__main__":
+    import threading
+    import webbrowser
+    import time
+    
+    def open_browser():
+        time.sleep(1.5)
+        webbrowser.open("http://127.0.0.1:8543/")
+        
+    threading.Thread(target=open_browser, daemon=True).start()
+    
     print("启动番茄小说网页控制台（Jinja2 auto_reload + uvicorn reload）...")
     uvicorn.run("web_ui:app", host="127.0.0.1", port=8543, reload=True)
