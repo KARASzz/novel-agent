@@ -232,3 +232,28 @@ def test_real_run_stops_on_orchestrator_failure(monkeypatch, tmp_path):
     assert result.failed_chapter == 2
     assert "stage_8_not_approved" in result.error
     assert runner.load_progress("sample_zerg_queen").next_chapter_index == 2
+
+
+def test_review_packet_is_written_after_successful_run(monkeypatch, tmp_path):
+    fake = FakeOrchestrator()
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test")
+    monkeypatch.setattr("core_engine.production_runner.ChapterOrchestrator", lambda: fake)
+    monkeypatch.setattr("core_engine.production_runner.LLMClient", lambda api_key, base_url: object())
+    monkeypatch.setattr("core_engine.production_runner.load_config", lambda: _FAKE_CONFIG)
+
+    runner = ProductionRunner(workspace_root=tmp_path)
+    result = runner.run(project_id="sample_zerg_queen", chapters=1)
+
+    run_root = (
+        tmp_path
+        / "novel_outputs"
+        / "production_runs"
+        / "sample_zerg_queen"
+        / "runs"
+        / result.run_id
+    )
+    review = run_root / "review_packet" / "batch_review.md"
+    continuity = run_root / "review_packet" / "continuity_report.json"
+    assert review.exists()
+    assert "第 1 章" in review.read_text(encoding="utf-8")
+    assert json.loads(continuity.read_text(encoding="utf-8"))["completed_chapters"] == [1]

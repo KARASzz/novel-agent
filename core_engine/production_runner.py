@@ -264,6 +264,54 @@ class ProductionRunner:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    def _write_review_packet(
+        self,
+        run_root: Path,
+        result: "ProductionRunResult",
+        chapter_titles: List[str],
+    ) -> None:
+        review_dir = run_root / "review_packet"
+        review_dir.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "# 批次审稿包",
+            "",
+            f"- 项目: {result.project_id}",
+            f"- 运行: {result.run_id}",
+            f"- 停点: {result.stop_reason}",
+            f"- 已完成章节: {', '.join(str(item) for item in result.completed_chapters) or '无'}",
+            f"- 失败章节: {result.failed_chapter or '无'}",
+            "",
+            "## 章节状态",
+            "",
+        ]
+        for chapter_index, title in zip(result.chapter_indexes, chapter_titles):
+            status = "完成" if chapter_index in result.completed_chapters else "未完成"
+            lines.append(f"- 第 {chapter_index} 章：{title}：{status}")
+        lines.extend(
+            [
+                "",
+                "## 下一步建议",
+                "",
+                "- 若本批口感、设定边界和章尾钩子通过人工审稿，继续下一停点。",
+                "- 若存在第8步不放行或连续性风险，先修复失败章节，再恢复生产。",
+            ]
+        )
+        (review_dir / "batch_review.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        self._write_json(
+            review_dir / "continuity_report.json",
+            {
+                "project_id": result.project_id,
+                "run_id": result.run_id,
+                "completed_chapters": result.completed_chapters,
+                "failed_chapter": result.failed_chapter,
+                "stop_reason": result.stop_reason,
+            },
+        )
+        (review_dir / "next_batch_suggestions.md").write_text(
+            "# 下一批建议\n\n通过人工审稿后，从 progress.json 的 next_chapter_index 继续生产。\n",
+            encoding="utf-8",
+        )
+
     def run(
         self,
         project_id: str = DEFAULT_PROJECT_ID,
@@ -376,5 +424,6 @@ class ProductionRunner:
             run_root=str(run_root),
             next_action="review_packet" if ok else "repair_failed_chapter",
         )
+        self._write_review_packet(run_root, result, plan.chapter_titles)
         self._write_json(run_root / "run_summary.json", asdict(result))
         return result

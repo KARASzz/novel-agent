@@ -20,8 +20,9 @@ class ProjectPackager:
         """组装番茄小说投稿/存稿包。保留旧方法名以兼容 CLI 和批处理入口。"""
         return self.create_fanqie_package(project_name=project_name, genre=genre, author_name=author_name)
 
-    def _chapter_files_from_novel_outputs(self) -> list[str]:
-        pattern = os.path.join(self.novel_output_dir, "*", "chapter_*", "chapter.md")
+    def _chapter_files_from_novel_outputs(self, source_root: str | None = None) -> list[str]:
+        root = source_root or self.novel_output_dir
+        pattern = os.path.join(root, "*", "chapter_*", "chapter.md")
         return sorted(glob.glob(pattern))
 
     @staticmethod
@@ -29,9 +30,10 @@ class ProjectPackager:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
 
-    def _collect_writebacks(self) -> list[dict]:
+    def _collect_writebacks(self, source_root: str | None = None) -> list[dict]:
         writebacks = []
-        pattern = os.path.join(self.novel_output_dir, "*", "chapter_*", "next_chapter_writeback.json")
+        root = source_root or self.novel_output_dir
+        pattern = os.path.join(root, "*", "chapter_*", "next_chapter_writeback.json")
         for path in sorted(glob.glob(pattern)):
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -41,24 +43,33 @@ class ProjectPackager:
             writebacks.append(payload)
         return writebacks
 
-    def _collect_quality_reports(self) -> list[tuple[str, str]]:
+    def _collect_quality_reports(self, source_root: str | None = None) -> list[tuple[str, str]]:
         reports = []
-        pattern = os.path.join(self.novel_output_dir, "*", "chapter_*", "fanqie_quality_report.json")
+        root = source_root or self.novel_output_dir
+        pattern = os.path.join(root, "*", "chapter_*", "fanqie_quality_report.json")
         for path in sorted(glob.glob(pattern)):
             reports.append((path, self._read_text(path)))
         return reports
 
-    def create_fanqie_package(self, project_name: str, genre: str, author_name: str) -> str:
+    def create_fanqie_package(
+        self,
+        project_name: str,
+        genre: str,
+        author_name: str,
+        source_root: str | None = None,
+        package_dir: str | None = None,
+    ) -> str:
         """输出番茄小说投稿/存稿结构 ZIP。"""
-        os.makedirs(self.package_dir, exist_ok=True)
+        target_package_dir = package_dir or self.package_dir
+        os.makedirs(target_package_dir, exist_ok=True)
 
         date_str = datetime.now().strftime("%Y%m%d")
         zip_name = f"【{genre}】{project_name}_{author_name}_番茄小说存稿包_{date_str}.zip"
-        zip_path = os.path.join(self.package_dir, zip_name)
+        zip_path = os.path.join(target_package_dir, zip_name)
 
-        chapter_files = self._chapter_files_from_novel_outputs()
-        writebacks = self._collect_writebacks()
-        quality_reports = self._collect_quality_reports()
+        chapter_files = self._chapter_files_from_novel_outputs(source_root)
+        writebacks = self._collect_writebacks(source_root)
+        quality_reports = self._collect_quality_reports(source_root)
 
         manifest = {
             "project_name": project_name,
@@ -67,7 +78,7 @@ class ProjectPackager:
             "package_type": "fanqie_novel_draft",
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "chapter_count": len(chapter_files),
-            "source": "novel_outputs",
+            "source": source_root or "novel_outputs",
         }
 
         print("📦 [打包程序] 正在生成番茄小说投稿/存稿包...")
