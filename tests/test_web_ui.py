@@ -360,3 +360,13 @@ def test_production_start_api_dispatches_runner(monkeypatch):
     assert calls["project_id"] == "sample_zerg_queen"
     assert calls["model_slot"] == "model_slot_1"
     assert calls["dry_run"] is True
+
+
+def test_dashboard_exposes_longform_production_section():
+    section = next(section for section in web_ui.DASHBOARD_SECTIONS if section["id"] == "longform_production")
+    command_ids = {command["id"] for command in section["commands"]}
+
+    assert section["title"] == "长篇连载生产线"
+    assert "production_status" in command_ids
+    assert "production_dry_run" in command_ids
+    assert "production_start" in command_ids

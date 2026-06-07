@@ -156,6 +156,10 @@
             background: #f3f4f6;
         }
 
+        .module-longform {
+            background: #e8f6f3;
+        }
+
         .module-title {
             display: flex;
             align-items: baseline;
@@ -1304,9 +1308,55 @@
             }
         }
 
+        async function runProductionCommand(commandId) {
+            const outputBox = document.getElementById('output');
+            const modelSlot = document.getElementById('modelSelect').value;
+            const payload = {
+                project_id: "sample_zerg_queen",
+                model_slot: modelSlot,
+            };
+            let url = "/api/production/status";
+            let options = { method: "GET" };
+            if (commandId === "production_dry_run") {
+                url = "/api/production/start";
+                payload.dry_run = true;
+                options = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                };
+            }
+            if (commandId === "production_start") {
+                url = "/api/production/start";
+                payload.dry_run = false;
+                options = {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                };
+            }
+            document.getElementById('lastRun').textContent = `执行中: ${commandId}`;
+            outputBox.textContent = `[Production] 正在调用 ${url}\n`;
+            try {
+                const response = await fetch(url, options);
+                const data = await response.json();
+                outputBox.textContent += `\n[Result]\n${JSON.stringify(data, null, 2)}`;
+                document.getElementById('lastRun').textContent = data.ok
+                    ? `完成: ${commandId}`
+                    : `失败: ${commandId}`;
+            } catch (error) {
+                outputBox.textContent += `\n[Error] ${error}`;
+                document.getElementById('lastRun').textContent = `失败: ${commandId}`;
+            }
+        }
+
         async function runCommand(cmd) {
             if (cmd === 'init_self_check') {
                 await runInitializationSelfCheck();
+                return;
+            }
+            if (cmd === 'production_status' || cmd === 'production_dry_run' || cmd === 'production_start') {
+                await runProductionCommand(cmd);
                 return;
             }
             const outputBox = document.getElementById('output');

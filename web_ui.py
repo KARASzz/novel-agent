@@ -456,6 +456,7 @@ def _initialization_self_check_payload() -> Dict[str, Any]:
 
 DASHBOARD_SECTIONS = [
     {
+        "id": "preflight",
         "title": "立项与项目包",
         "tone": "module-preflight",
         "description": "前置立项、项目包和新书入口。",
@@ -465,6 +466,7 @@ DASHBOARD_SECTIONS = [
         ],
     },
     {
+        "id": "chapter",
         "title": "工业化章节生产",
         "tone": "module-chapter",
         "description": "九步章节生产线与连续章节生产执行。",
@@ -474,6 +476,18 @@ DASHBOARD_SECTIONS = [
         ],
     },
     {
+        "id": "longform_production",
+        "title": "长篇连载生产线",
+        "tone": "module-longform",
+        "description": "正式长篇生产控制器：每章完整九步，按 1-3、4-6、6/6/6/7 停点审稿。",
+        "commands": [
+            {"id": "production_status", "label": "查看生产计划", "icon": "📋"},
+            {"id": "production_dry_run", "label": "Dry Run", "icon": "🧪"},
+            {"id": "production_start", "label": "启动正式生产", "icon": "🚀"},
+        ],
+    },
+    {
+        "id": "knowledge",
         "title": "搜索与知识库",
         "tone": "module-knowledge",
         "description": "本地知识库、Tavily/Brave 搜索诊断与素材更新。",
@@ -484,6 +498,7 @@ DASHBOARD_SECTIONS = [
         ],
     },
     {
+        "id": "export",
         "title": "质检与导出",
         "tone": "module-export",
         "description": "章节质检、自检和番茄小说存稿包导出。",
@@ -493,6 +508,7 @@ DASHBOARD_SECTIONS = [
         ],
     },
     {
+        "id": "system",
         "title": "系统工具",
         "tone": "module-system",
         "description": "缓存、模型诊断和控制台进程管理。",
