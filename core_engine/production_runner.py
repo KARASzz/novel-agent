@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from chapter_pipeline import ChapterOrchestrator, ChapterPipelineInput
+from core_engine.config_loader import load_config, resolve_model_config
+from core_engine.llm_client import LLMClient
 
 
 DEFAULT_PROJECT_ID = "sample_zerg_queen"
@@ -229,6 +234,28 @@ class ProductionRunner:
             dry_run=dry_run,
         )
 
+    def _resolve_model(self, model_slot: str) -> Dict[str, str]:
+        cfg = load_config()
+        model_cfg = resolve_model_config(cfg, model_slot)
+        missing_fields = [
+            field
+            for field in ("base_url", "model_id", "api_key_env")
+            if not str(model_cfg.get(field) or "").strip()
+        ]
+        if missing_fields:
+            raise RuntimeError("missing_model_config:" + ",".join(missing_fields))
+        api_key_env = str(model_cfg["api_key_env"])
+        api_key = os.environ.get(api_key_env)
+        if not api_key:
+            raise RuntimeError(f"missing_env:{api_key_env}")
+        return {
+            "slot_name": str(model_cfg["slot_name"]),
+            "base_url": str(model_cfg["base_url"]),
+            "model_id": str(model_cfg["model_id"]),
+            "api_key_env": api_key_env,
+            "api_key": api_key,
+        }
+
     @staticmethod
     def _new_run_id() -> str:
         return "run_" + datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -283,4 +310,71 @@ class ProductionRunner:
             self._write_json(run_root / "run_summary.json", asdict(result))
             return result
 
-        raise RuntimeError("production execution is implemented in the execution task")
+        project = self.ensure_project(plan.project_id)
+        progress = self.load_progress(plan.project_id)
+        model = self._resolve_model(plan.model_slot)
+        orchestrator = ChapterOrchestrator()
+        orchestrator.llm_client = LLMClient(api_key=model["api_key"], base_url=model["base_url"])
+        completed: List[int] = []
+        previous_writeback = progress.previous_chapter_writeback
+        failed_chapter: Optional[int] = None
+        error = ""
+
+        chapters_root = run_root / "chapters"
+        for chapter_index, chapter_title in zip(plan.chapter_indexes, plan.chapter_titles):
+            position = self.position_for_chapter(chapter_index)
+            try:
+                chapter_input = ChapterPipelineInput(
+                    project_bundle=project.project_bundle(),
+                    current_chapter=chapter_title,
+                    previous_chapter_writeback=previous_writeback,
+                    local_kb_reference="正式长篇生产：本轮以项目包、当前章节和上一章第9步回写作为连续性主输入。",
+                    search_summary="正式长篇生产：本轮不额外扩展跨章搜索摘要；如需联网资料，由章节编排器在章内按需处理。",
+                    chapter_index=chapter_index,
+                    model_slot=plan.model_slot,
+                )
+                output = orchestrator.run_chapter(
+                    project_goal=f"{project.title} 正式长篇连载生产",
+                    chapter_input=chapter_input,
+                    model_id=model["model_id"],
+                    output_root=chapters_root,
+                    write_files=True,
+                    verbose=True,
+                )
+                completed.append(chapter_index)
+                previous_writeback = json.dumps(output.next_chapter_writeback, ensure_ascii=False)
+                progress.last_completed_chapter_index = chapter_index
+                progress.next_chapter_index = chapter_index + 1
+                progress.previous_chapter_writeback = previous_writeback
+                progress.current_volume = position["volume"]
+                progress.current_arc = position["arc"]
+                progress.current_unit = position["unit"]
+                progress.last_run_id = run_id
+                progress.last_review_stop_point = plan.stop_reason
+                progress.state = "ready"
+                self.save_progress(plan.project_id, progress)
+            except Exception as exc:
+                failed_chapter = chapter_index
+                error = str(exc) or exc.__class__.__name__
+                progress.next_chapter_index = chapter_index
+                progress.state = "failed"
+                progress.last_run_id = run_id
+                self.save_progress(plan.project_id, progress)
+                break
+
+        ok = failed_chapter is None
+        result = ProductionRunResult(
+            ok=ok,
+            run_id=run_id,
+            project_id=plan.project_id,
+            dry_run=False,
+            chapter_indexes=plan.chapter_indexes,
+            stop_reason=plan.stop_reason,
+            completed_chapters=completed,
+            failed_chapter=failed_chapter,
+            error=error,
+            run_root=str(run_root),
+            next_action="review_packet" if ok else "repair_failed_chapter",
+        )
+        self._write_json(run_root / "run_summary.json", asdict(result))
+        return result

@@ -133,3 +133,102 @@ def test_dry_run_persists_run_config_and_summary_without_chapters(tmp_path):
     assert summary["chapter_indexes"] == [1, 2, 3]
     assert summary["stop_reason"] == "opening_review"
     assert summary["next_action"] == "dry_run_only"
+
+
+from types import SimpleNamespace
+
+
+class FakeOrchestrator:
+    def __init__(self):
+        self.calls = []
+        self.llm_client = None
+
+    def run_chapter(self, project_goal, chapter_input, model_id, output_root, write_files=True, verbose=True):
+        self.calls.append(
+            {
+                "project_goal": project_goal,
+                "chapter": chapter_input.current_chapter,
+                "index": chapter_input.chapter_index,
+                "previous": chapter_input.previous_chapter_writeback,
+                "model_id": model_id,
+                "output_root": str(output_root),
+            }
+        )
+        return SimpleNamespace(
+            project_id=chapter_input.project_bundle["project_id"],
+            chapter_index=chapter_input.chapter_index,
+            chapter_title=chapter_input.current_chapter,
+            chapter_text=f"# {chapter_input.current_chapter}\n正文",
+            stage_summaries={"stage_9": "已回写"},
+            fanqie_quality_report={"is_valid": True, "score": 90},
+            next_chapter_writeback={
+                "source_chapter_index": chapter_input.chapter_index,
+                "writeback_script": f"第{chapter_input.chapter_index}章回写",
+            },
+            output_files={},
+        )
+
+
+_FAKE_CONFIG = {
+    "models": {
+        "default_slot": "model_slot_1",
+        "slots": {
+            "model_slot_1": {
+                "display_name": "MiniMax-M3",
+                "base_url": "https://api.minimaxi.com/v1",
+                "api_key_env": "MINIMAX_API_KEY",
+                "model_id": "MiniMax-M3",
+                "enabled": True,
+            }
+        },
+    },
+    "llm": {},
+}
+
+
+def test_real_run_chains_only_step_9_writeback(monkeypatch, tmp_path):
+    fake = FakeOrchestrator()
+
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test")
+    monkeypatch.setattr("core_engine.production_runner.ChapterOrchestrator", lambda: fake)
+    monkeypatch.setattr("core_engine.production_runner.LLMClient", lambda api_key, base_url: object())
+    monkeypatch.setattr("core_engine.production_runner.load_config", lambda: _FAKE_CONFIG)
+
+    runner = ProductionRunner(workspace_root=tmp_path)
+    result = runner.run(project_id="sample_zerg_queen", chapters=2)
+
+    assert result.ok is True
+    assert result.completed_chapters == [1, 2]
+    assert fake.calls[0]["previous"] == "新书开局，败局重启，无上一章回写。"
+    assert json.loads(fake.calls[1]["previous"]) == {
+        "source_chapter_index": 1,
+        "writeback_script": "第1章回写",
+    }
+
+    progress = runner.load_progress("sample_zerg_queen")
+    assert progress.last_completed_chapter_index == 2
+    assert progress.next_chapter_index == 3
+    assert json.loads(progress.previous_chapter_writeback)["source_chapter_index"] == 2
+
+
+def test_real_run_stops_on_orchestrator_failure(monkeypatch, tmp_path):
+    class FailingOrchestrator(FakeOrchestrator):
+        def run_chapter(self, *args, **kwargs):
+            if len(self.calls) == 1:
+                raise RuntimeError("stage_8_not_approved")
+            return super().run_chapter(*args, **kwargs)
+
+    fake = FailingOrchestrator()
+    monkeypatch.setenv("MINIMAX_API_KEY", "sk-test")
+    monkeypatch.setattr("core_engine.production_runner.ChapterOrchestrator", lambda: fake)
+    monkeypatch.setattr("core_engine.production_runner.LLMClient", lambda api_key, base_url: object())
+    monkeypatch.setattr("core_engine.production_runner.load_config", lambda: _FAKE_CONFIG)
+
+    runner = ProductionRunner(workspace_root=tmp_path)
+    result = runner.run(project_id="sample_zerg_queen", chapters=3)
+
+    assert result.ok is False
+    assert result.completed_chapters == [1]
+    assert result.failed_chapter == 2
+    assert "stage_8_not_approved" in result.error
+    assert runner.load_progress("sample_zerg_queen").next_chapter_index == 2
