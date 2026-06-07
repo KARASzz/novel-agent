@@ -286,3 +286,77 @@ def test_browser_preview_route_is_not_registered():
 
 def test_jinja_templates_are_auto_reload_enabled():
     assert getattr(web_ui.templates.env, "auto_reload", False) is True
+
+
+def test_production_status_api_returns_plan(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    FakePlan = SimpleNamespace(
+        project_id="sample_zerg_queen",
+        chapter_indexes=[1, 2, 3],
+        chapter_titles=["第一章", "第二章", "第三章"],
+        stop_reason="opening_review",
+        model_slot="model_slot_1",
+        output_root=str(tmp_path),
+        dry_run=True,
+    )
+
+    class FakeRunner:
+        def __init__(self, workspace_root):
+            assert workspace_root == web_ui.BASE_DIR
+
+        def plan_run(self, project_id, model_slot=None, dry_run=True):
+            return FakePlan
+
+    monkeypatch.setattr(web_ui, "ProductionRunner", FakeRunner, raising=False)
+
+    import asyncio
+
+    payload = asyncio.run(web_ui.production_status())
+
+    assert payload["ok"] is True
+    assert payload["plan"]["chapter_indexes"] == [1, 2, 3]
+    assert payload["plan"]["stop_reason"] == "opening_review"
+
+
+def test_production_start_api_dispatches_runner(monkeypatch):
+    from types import SimpleNamespace
+
+    calls = {}
+    FakeResult = SimpleNamespace(
+        ok=True,
+        run_id="run_web",
+        project_id="sample_zerg_queen",
+        dry_run=True,
+        chapter_indexes=[1, 2, 3],
+        stop_reason="opening_review",
+        completed_chapters=[],
+        failed_chapter=None,
+        error="",
+        run_root="/tmp/run_web",
+        next_action="dry_run_only",
+    )
+
+    class FakeRunner:
+        def __init__(self, workspace_root):
+            pass
+
+        def run(self, **kwargs):
+            calls.update(kwargs)
+            return FakeResult
+
+    class FakeRequest:
+        async def json(self):
+            return {"project_id": "sample_zerg_queen", "model_slot": "model_slot_1", "dry_run": True}
+
+    monkeypatch.setattr(web_ui, "ProductionRunner", FakeRunner, raising=False)
+
+    import asyncio
+
+    payload = asyncio.run(web_ui.production_start(FakeRequest()))
+
+    assert payload["ok"] is True
+    assert payload["result"]["run_id"] == "run_web"
+    assert calls["project_id"] == "sample_zerg_queen"
+    assert calls["model_slot"] == "model_slot_1"
+    assert calls["dry_run"] is True

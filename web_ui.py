@@ -16,6 +16,11 @@ from core_engine.runtime_env import bootstrap_runtime_environment, describe_runt
 from web_file_catalog import GeneratedFileCatalog
 
 try:
+    from core_engine.production_runner import ProductionRunner
+except Exception:  # pragma: no cover
+    ProductionRunner = None  # type: ignore[assignment]
+
+try:
     from fastapi.templating import Jinja2Templates
 except ImportError:  # pragma: no cover - only used in dependency-incomplete test envs
     class _TemplateEnv:
@@ -514,6 +519,14 @@ async def read_root(request: Request):
     )
 
 
+def _dataclass_payload(value: Any) -> Dict[str, Any]:
+    if hasattr(value, "__dict__"):
+        return dict(value.__dict__)
+    if isinstance(value, dict):
+        return dict(value)
+    return {"value": value}
+
+
 def _model_options() -> Dict[str, Any]:
     cfg = load_config()
     registry = cfg.get("models", {})
@@ -552,6 +565,44 @@ async def generated_files():
 @app.get("/api/orchestrator-status")
 async def orchestrator_status():
     return _orchestrator_status_payload()
+
+
+@app.get("/api/production/status")
+async def production_status():
+    if ProductionRunner is None:
+        return _command_result(ok=False, error="长篇连载生产控制器不可用。", command="production_status")
+    runner = ProductionRunner(BASE_DIR)
+    plan = runner.plan_run(project_id="sample_zerg_queen", dry_run=True)
+    return _command_result(
+        ok=True,
+        command="production_status",
+        plan=_dataclass_payload(plan),
+    )
+
+
+@app.post("/api/production/start")
+async def production_start(request: Request):
+    if ProductionRunner is None:
+        return _command_result(ok=False, error="长篇连载生产控制器不可用。", command="production_start")
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    runner = ProductionRunner(BASE_DIR)
+    result = runner.run(
+        project_id=str(payload.get("project_id") or "sample_zerg_queen"),
+        chapters=payload.get("chapters"),
+        from_chapter=payload.get("from_chapter"),
+        model_slot=str(payload.get("model_slot") or "").strip() or None,
+        dry_run=bool(payload.get("dry_run", False)),
+        force=bool(payload.get("force", False)),
+    )
+    return _command_result(
+        ok=bool(result.ok),
+        command="production_start",
+        result=_dataclass_payload(result),
+        error=getattr(result, "error", ""),
+    )
 
 
 @app.post("/api/initialization-self-check")
