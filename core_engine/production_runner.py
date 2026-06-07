@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass, field
@@ -64,8 +65,14 @@ class ProductionPlan:
 
 
 def _safe_slug(value: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", value.strip()).strip("_")
-    return slug or DEFAULT_PROJECT_ID
+    normalized = value.strip()
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "_", normalized).strip("_")
+    if slug and slug == normalized:
+        return slug
+
+    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10]
+    prefix = slug or DEFAULT_PROJECT_ID
+    return f"{prefix}_{digest}"
 
 
 def _default_project(project_id: str = DEFAULT_PROJECT_ID) -> ProductionProject:
@@ -124,6 +131,10 @@ class ProductionRunner:
     def save_progress(self, project_id: str, progress: ProductionProgress) -> None:
         root = self.project_root(project_id)
         root.mkdir(parents=True, exist_ok=True)
+        position = self.position_for_chapter(progress.next_chapter_index)
+        progress.current_volume = position["volume"]
+        progress.current_arc = position["arc"]
+        progress.current_unit = position["unit"]
         (root / "progress.json").write_text(
             json.dumps(asdict(progress), ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -178,9 +189,19 @@ class ProductionRunner:
     ) -> ProductionPlan:
         project = self.ensure_project(project_id)
         progress = self.load_progress(project.project_id)
-        start = from_chapter or progress.next_chapter_index
+        start = from_chapter if from_chapter is not None else progress.next_chapter_index
+        if start > project.total_chapters:
+            return ProductionPlan(
+                project_id=project.project_id,
+                chapter_indexes=[],
+                chapter_titles=[],
+                stop_reason="book_completed",
+                model_slot=model_slot or project.default_model_slot,
+                output_root=str(self.project_root(project.project_id)),
+                dry_run=dry_run,
+            )
         default_count, stop_reason = self._default_count_and_reason(start)
-        count = chapters or default_count
+        count = chapters if chapters is not None else default_count
         indexes = list(range(start, min(start + count, project.total_chapters + 1)))
         return ProductionPlan(
             project_id=project.project_id,
