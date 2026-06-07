@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -62,6 +63,21 @@ class ProductionPlan:
     model_slot: str
     output_root: str
     dry_run: bool = True
+
+
+@dataclass
+class ProductionRunResult:
+    ok: bool
+    run_id: str
+    project_id: str
+    dry_run: bool
+    chapter_indexes: List[int]
+    stop_reason: str
+    completed_chapters: List[int] = field(default_factory=list)
+    failed_chapter: Optional[int] = None
+    error: str = ""
+    run_root: str = ""
+    next_action: str = ""
 
 
 def _safe_slug(value: str) -> str:
@@ -212,3 +228,59 @@ class ProductionRunner:
             output_root=str(self.project_root(project.project_id)),
             dry_run=dry_run,
         )
+
+    @staticmethod
+    def _new_run_id() -> str:
+        return "run_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    def _write_json(self, path: Path, payload: Dict[str, Any]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def run(
+        self,
+        project_id: str = DEFAULT_PROJECT_ID,
+        chapters: Optional[int] = None,
+        from_chapter: Optional[int] = None,
+        model_slot: Optional[str] = None,
+        dry_run: bool = False,
+        force: bool = False,
+    ) -> ProductionRunResult:
+        plan = self.plan_run(
+            project_id=project_id,
+            chapters=chapters,
+            from_chapter=from_chapter,
+            model_slot=model_slot,
+            dry_run=dry_run,
+        )
+        run_id = self._new_run_id()
+        run_root = self.project_root(plan.project_id) / "runs" / run_id
+        run_root.mkdir(parents=True, exist_ok=True)
+
+        run_config = {
+            "run_id": run_id,
+            "project_id": plan.project_id,
+            "chapter_indexes": plan.chapter_indexes,
+            "chapter_titles": plan.chapter_titles,
+            "stop_reason": plan.stop_reason,
+            "model_slot": plan.model_slot,
+            "dry_run": dry_run,
+            "force": force,
+        }
+        self._write_json(run_root / "run_config.json", run_config)
+
+        if dry_run:
+            result = ProductionRunResult(
+                ok=True,
+                run_id=run_id,
+                project_id=plan.project_id,
+                dry_run=True,
+                chapter_indexes=plan.chapter_indexes,
+                stop_reason=plan.stop_reason,
+                run_root=str(run_root),
+                next_action="dry_run_only",
+            )
+            self._write_json(run_root / "run_summary.json", asdict(result))
+            return result
+
+        raise RuntimeError("production execution is implemented in the execution task")

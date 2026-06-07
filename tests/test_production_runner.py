@@ -108,3 +108,28 @@ def test_save_progress_syncs_position_fields_from_next_chapter(tmp_path):
     assert reloaded.current_volume == 1
     assert reloaded.current_arc == 2
     assert reloaded.current_unit == 1
+
+
+def test_dry_run_persists_run_config_and_summary_without_chapters(tmp_path):
+    runner = ProductionRunner(workspace_root=tmp_path)
+
+    result = runner.run(project_id="sample_zerg_queen", dry_run=True)
+
+    run_root = (
+        tmp_path
+        / "novel_outputs"
+        / "production_runs"
+        / "sample_zerg_queen"
+        / "runs"
+        / result.run_id
+    )
+    assert result.ok is True
+    assert result.dry_run is True
+    assert (run_root / "run_config.json").exists()
+    assert (run_root / "run_summary.json").exists()
+    assert not (run_root / "chapters").exists()
+
+    summary = json.loads((run_root / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["chapter_indexes"] == [1, 2, 3]
+    assert summary["stop_reason"] == "opening_review"
+    assert summary["next_action"] == "dry_run_only"
