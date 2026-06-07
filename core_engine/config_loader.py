@@ -121,12 +121,12 @@ def _defaults() -> Dict[str, Any]:
             "default_slot": DEFAULT_MODEL_SLOT,
             "slots": {
                 "model_slot_1": {
-                    "display_name": "模型占位 1",
-                    "base_url": "",
+                    "display_name": "MiniMax-M3",
+                    "base_url": "https://api.minimaxi.com/v1",
                     "api_key_env": "MINIMAX_API_KEY",
-                    "model_id": "MiniMax-M2.7",
+                    "model_id": "MiniMax-M3",
                     "enabled": True,
-                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                    "note": "MiniMax OpenAI 兼容接口，API Key 从本机 MINIMAX_API_KEY 环境变量读取。",
                 },
                 "model_slot_2": {
                     "display_name": "模型占位 2",
@@ -166,7 +166,7 @@ def _defaults() -> Dict[str, Any]:
             "model_slot": DEFAULT_MODEL_SLOT,
             "api_key_env": "MINIMAX_API_KEY",
             "base_url": "https://api.minimaxi.com/v1",
-            "model": "MiniMax-M2.7",
+            "model": "MiniMax-M3",
             "max_retries": 3,
             "timeout": 300,
             "enable_rag": False,

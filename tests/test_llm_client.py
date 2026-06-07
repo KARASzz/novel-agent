@@ -135,3 +135,17 @@ def test_resolve_model_config_reads_five_slots():
     assert resolved["base_url"] == "https://example-3.test/v1"
     assert resolved["api_key_env"] == "MODEL_SLOT_3_API_KEY"
     assert resolved["model_id"] == "model-3"
+
+
+def test_default_model_slot_is_minimax_m3():
+    from core_engine.config_loader import load_config, reset_config_cache
+
+    reset_config_cache()
+    cfg = load_config()
+    resolved = resolve_model_config(cfg, "model_slot_1")
+
+    assert resolved["slot_name"] == "model_slot_1"
+    assert resolved["display_name"] == "MiniMax-M3"
+    assert resolved["base_url"] == "https://api.minimaxi.com/v1"
+    assert resolved["api_key_env"] == "MINIMAX_API_KEY"
+    assert resolved["model_id"] == "MiniMax-M3"

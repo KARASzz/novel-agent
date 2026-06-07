@@ -54,7 +54,7 @@ python -m pip install -e .
 
 ```powershell
 # 模型 API Key（按当前槽位映射设置）
-# model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M2.7
+# model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M3
 $env:MINIMAX_API_KEY="sk-..."
 # model_slot_2 -> DASHSCOPE_API_KEY -> kimi-k2.6
 $env:DASHSCOPE_API_KEY="sk-..."
