@@ -97,3 +97,80 @@ def test_cli_ltm_review_dispatch(monkeypatch):
 
     assert exit_code == 0
     assert calls == {"project_id": "p1", "apply_approved": True}
+
+
+def test_cli_production_run_dispatches_to_runner(monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    calls = {}
+    FakeResult = SimpleNamespace(
+        ok=True,
+        run_id="run_test",
+        project_id="sample_zerg_queen",
+        dry_run=True,
+        chapter_indexes=[1, 2, 3],
+        stop_reason="opening_review",
+        completed_chapters=[],
+        failed_chapter=None,
+        error="",
+        run_root="/tmp/run_test",
+        next_action="dry_run_only",
+    )
+
+    class FakeRunner:
+        def __init__(self, workspace_root):
+            calls["workspace_root"] = workspace_root
+
+        def run(self, **kwargs):
+            calls.update(kwargs)
+            return FakeResult
+
+    monkeypatch.setattr(cli, "ProductionRunner", FakeRunner, raising=False)
+
+    exit_code = cli.main([
+        "production-run",
+        "--project",
+        "sample_zerg_queen",
+        "--chapters",
+        "3",
+        "--model-slot",
+        "model_slot_1",
+        "--dry-run",
+    ])
+
+    output = capsys.readouterr().out
+    assert exit_code == 0
+    assert calls["project_id"] == "sample_zerg_queen"
+    assert calls["chapters"] == 3
+    assert calls["model_slot"] == "model_slot_1"
+    assert calls["dry_run"] is True
+    assert "run_test" in output
+
+
+def test_cli_production_run_returns_failure_exit(monkeypatch):
+    from types import SimpleNamespace
+
+    FakeResult = SimpleNamespace(
+        ok=False,
+        run_id="run_failed",
+        project_id="sample_zerg_queen",
+        dry_run=False,
+        chapter_indexes=[1],
+        stop_reason="opening_review",
+        completed_chapters=[],
+        failed_chapter=1,
+        error="missing_env:MINIMAX_API_KEY",
+        run_root="/tmp/run_failed",
+        next_action="repair_failed_chapter",
+    )
+
+    class FakeRunner:
+        def __init__(self, workspace_root):
+            pass
+
+        def run(self, **kwargs):
+            return FakeResult
+
+    monkeypatch.setattr(cli, "ProductionRunner", FakeRunner, raising=False)
+
+    assert cli.main(["production-run", "--project", "sample_zerg_queen"]) == 1

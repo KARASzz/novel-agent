@@ -6,6 +6,11 @@ from typing import Optional, Sequence
 
 from core_engine.runtime_env import bootstrap_runtime_environment
 
+try:
+    from core_engine.production_runner import ProductionRunner
+except Exception:  # pragma: no cover - import errors surface when command runs
+    ProductionRunner = None  # type: ignore[assignment]
+
 
 def _configure_stdio() -> None:
     """Force UTF-8 output so Windows console commands don't crash on Unicode."""
@@ -239,6 +244,30 @@ def _self_test_command(target: str) -> None:
     run_self_test()
 
 
+def _production_run_command(
+    project_id: str,
+    chapters: Optional[int],
+    from_chapter: Optional[int],
+    model_slot: Optional[str],
+    dry_run: bool,
+    force: bool,
+) -> int:
+    if ProductionRunner is None:
+        print("❌ 长篇连载生产控制器不可用。")
+        return 1
+    runner = ProductionRunner(_get_workspace())
+    result = runner.run(
+        project_id=project_id,
+        chapters=chapters,
+        from_chapter=from_chapter,
+        model_slot=model_slot,
+        dry_run=dry_run,
+        force=force,
+    )
+    print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+    return 0 if result.ok else 1
+
+
 def _ltm_review_command(project_id: Optional[str], apply_approved: bool) -> int:
     from pre_hub.ltm import LTMGovernance
 
@@ -330,6 +359,14 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument("--genre", required=True, help="题材或投稿赛道")
     export_parser.add_argument("--author", required=True, help="笔名或工作室名")
 
+    production_parser = subparsers.add_parser("production-run", help="长篇连载生产线：按停点生成章节并产出审稿包")
+    production_parser.add_argument("--project", default="sample_zerg_queen", help="项目 ID，默认虫族女皇正式生产预设")
+    production_parser.add_argument("--chapters", type=int, help="本轮手动生成章数，默认跑到下一停点")
+    production_parser.add_argument("--from-chapter", type=int, help="从指定章节开始修复或恢复")
+    production_parser.add_argument("--model-slot", help="模型槽位，默认使用项目配置")
+    production_parser.add_argument("--dry-run", action="store_true", help="只展示并落盘本轮计划，不调用模型")
+    production_parser.add_argument("--force", action="store_true", help="允许显式修复或覆盖已有章节")
+
     subparsers.add_parser("verify-rag", help=argparse.SUPPRESS)
 
     self_test_parser = subparsers.add_parser("self-test", help="运行内置诊断自检")
@@ -389,6 +426,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             model_slot=args.model_slot,
             output_root=args.output_root,
             production=args.production,
+        )
+
+    if args.command == "production-run":
+        return _production_run_command(
+            project_id=args.project,
+            chapters=args.chapters,
+            from_chapter=args.from_chapter,
+            model_slot=args.model_slot,
+            dry_run=args.dry_run,
+            force=args.force,
         )
 
     if args.command == "search-diagnose":
