@@ -160,6 +160,14 @@
 - [x] 统一网页控制台启动链路，确保 `MINIMAX_API_KEY`、`TAVILY_API_KEY`、`BRAVE_SEARCH_API_KEY` 这些用户级环境变量在 web 进程里可见，并在启动时显式自检。
 - [x] 改 `web_ui.py` 的 `/api/run/*` 输出处理，保留子进程 `stderr`、退出码和原始异常文本，避免空的 `执行异常:`。
 - [x] 给工作模块按钮分开回显，`preflight`、`full_flow`、`produce_chapter`、`batch_produce`、`feed`、`inspire`、`diag_validator`、`export_fanqie`、`cache` 都有明确成功态和失败态。
-- [x] 固化模型槽位映射，明确 `model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M2.7`，并在按钮执行前验证 `base_url`、`model_id`、`api_key_env` 三项完整。
+- [x] 固化模型槽位映射，明确 `model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M3`，并在按钮执行前验证 `base_url`、`model_id`、`api_key_env` 三项完整。
 - [x] 补齐依赖清单，并把 `tavily-python` 对齐到 `0.7.24+`；`uvicorn[standard]` 热刷新依赖已写入安装说明。
 - [x] 保持 `search_diag` 作为可用基线，不重做搜索策略，只确认 Brave/Tavily 仍能正常调用，本地知识库继续作为补充来源。
+
+## 9. 长篇连载生产线
+
+- [x] 将默认 MiniMax 模型槽位更新为 `MiniMax-M3`。
+- [x] 新增长篇连载生产控制器，支持项目预设、进度、停点和审稿包。
+- [x] 新增 CLI `production-run`，以 dry-run 作为工程验收基线。
+- [x] 新增网页控制台长篇连载生产线入口。
+- [x] 保持每章独立执行完整九步母版，只用上一章第9步回写续接下一章。

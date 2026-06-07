@@ -86,6 +86,22 @@ python -m scripts.cli next-chapter "第一章：重回1998" --chapter-index 1 --
 python -m scripts.cli export-fanqie --name "重生之大亨" --genre "男频都市" --author "Author_X"
 ```
 
+### 长篇连载生产线
+
+正式生产入口使用每章完整九步母版，外层按审稿停点暂停：
+
+```bash
+python -m scripts.cli production-run --project sample_zerg_queen --dry-run
+python -m scripts.cli production-run --project sample_zerg_queen --model-slot model_slot_1
+```
+
+默认策略：
+- 第 1-3 章完成后暂停审稿。
+- 第 4-6 章完成后暂停审稿。
+- 后续按每弧内 `6 / 6 / 6 / 7` 结构单元暂停。
+
+`model_slot_1` 默认使用 `MiniMax-M3`，API Key 只从本机 `MINIMAX_API_KEY` 环境变量读取。
+
 ---
 
 ## 📂 目录结构 (Architecture)
