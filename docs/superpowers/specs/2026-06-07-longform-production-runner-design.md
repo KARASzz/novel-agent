@@ -1,121 +1,121 @@
-# Longform Production Runner Design
+# 长篇连载生产控制器设计
 
-## 1. Purpose
+## 1. 目标
 
-This design turns the project into a formal longform webnovel production tool for a 1,000,000+ word serial. The system must support a 400 chapter book, around 2,500 Chinese characters per chapter, while preserving the existing `《红星锚定》九步章节生产线完整母版 v2.2.md` as the chapter-level production unit.
+本设计把项目推进为正式可用的长篇网文生产工具，服务 100 万字以上的连载小说。系统需要支持一本 400 章规模的书，每章约 2500 个中文字符，同时保留现有 `《红星锚定》九步章节生产线完整母版 v2.2.md` 作为章级生产单元。
 
-The default production preset is:
+默认生产预设为：
 
-- Title: `我，虫族女皇，带领虫族踏遍万界`
-- Genre: `诸天万界流`
-- Core promise: a reborn Zerg queen leads her swarm through original shadow worlds and turns each world into an evolutionary resource field.
-- Opening stance: defeat-and-restart.
-- Protagonist style: elegant, dangerous, charismatic, and unstable in a controlled way.
-- IP policy: use original shadow worlds only. The first world is a `忍术血脉世界`, not a direct named IP world.
-- Default model: `model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M3`.
+- 书名：`我，虫族女皇，带领虫族踏遍万界`
+- 题材：`诸天万界流`
+- 核心承诺：败局重启的虫族女皇带领虫群进入原创影子世界，把每个世界变成虫族进化资源场。
+- 开局姿态：败局重启。
+- 主角风格：优雅、危险、有魅力，带一点受控的疯批感。
+- IP 口径：只使用原创影子世界。第一界是 `忍术血脉世界`，不直接使用任何真实知名 IP 世界名。
+- 默认模型：`model_slot_1 -> MINIMAX_API_KEY -> MiniMax-M3`。
 
-All model API keys must be read from local environment variables only. No key may be written into code, docs, config examples, logs, or generated artifacts.
+所有模型 API Key 必须只从本机环境变量读取。禁止把任何 Key 写入代码、文档、配置示例、日志或生成产物。
 
-## 2. Core Correction From Brainstorming
+## 2. 核心纠偏
 
-The nine-step master template is not a batch-generation template. It is the formal single-chapter construction unit.
+九步母版不是批量生成模板，而是正式的单章施工单元。
 
-The production runner must not compress multiple chapters into one prompt or one model conversation. Each chapter is an isolated run that executes the full nine-step pipeline:
+生产控制器不能把多章压进一个提示词或一个模型对话里生成。每一章都必须作为独立运行单元，完整执行九步流程：
 
-1. Chapter variable extraction
-2. Input card
-3. Ontology tree plus ToT path expansion
-4. X/Y double-line pruning
-5. Six-beat construction table
-6. Two-beat drafting plus six single-factor iterations
-7. Reader-side review and commercial revision
-8. Evidence-based exit gate
-9. Minimal next-chapter navigation script
+1. 章节变量自动抽取
+2. 输入卡
+3. 本体论文字树形图 + ToT 多路径发散
+4. X/Y 双线剪枝
+5. 六节拍施工表
+6. 两节拍正文 + 六轮单要素迭代
+7. 读者侧人工审阅与商业化润色
+8. 证据化出口闸门
+9. 章节走向极简脚本回写
 
-Chapter continuity is passed only through the previous chapter's step 9 navigation script. The runner must not pass the full previous chapter text into the next chapter.
+章间连续性只通过上一章的第9步极简脚本传递。生产控制器不得把上一章全文传给下一章。
 
-## 3. Production Cadence
+## 3. 生产节奏
 
-The runner produces one chapter per chapter-level round. The outer serial controller decides how many chapter rounds to execute before pausing for review.
+生产控制器每一轮章级生产只生成一章。外层连载控制器负责决定连续执行多少个章级轮次后暂停审稿。
 
-Default stop points:
+默认停点：
 
-- Opening exploration: run chapters 1-3, then pause.
-- First unit completion: run chapters 4-6, then pause.
-- Stable production: pause at the end of each structural unit using the existing `6 / 6 / 6 / 7` pattern inside every 25-chapter arc.
-- Arc review: every 25 chapters.
-- Volume review: every 100 chapters.
+- 开篇探索：第 1-3 章完成后暂停。
+- 首单元补齐：第 4-6 章完成后暂停。
+- 稳定生产：之后按每个 25 章弧内既有的 `6 / 6 / 6 / 7` 结构单元暂停。
+- 弧级复盘：每 25 章一次。
+- 卷级复盘：每 100 章一次。
 
-The default mode must be conservative. The system should stop early when a chapter fails a hard gate, rather than continue a damaged serial chain.
+默认模式必须保守。章节触发硬闸门失败时，系统应该尽早停止，而不是带着损坏的连续性继续生成后续章节。
 
-Manual overrides may allow a user to run a chosen chapter count, but the default experience should preserve the stop-point strategy above.
+可以允许用户手动指定连续生成章数，但默认体验必须遵守上述停点策略。
 
-## 4. Shared Architecture
+## 4. 共享架构
 
-Add a shared production core, tentatively named `core_engine/production_runner.py`. CLI and web UI should call this shared core instead of duplicating orchestration logic.
+新增共享生产核心，暂命名为 `core_engine/production_runner.py`。CLI 和网页控制台都调用这个共享核心，避免各自复制一套编排逻辑。
 
-Primary responsibilities:
+主要职责：
 
-- Load project metadata and progress.
-- Resolve the model slot.
-- Validate required environment variables.
-- Decide the next production stop point.
-- Build the chapter queue for this run.
-- Call the existing `ChapterOrchestrator.run_chapter` once per chapter.
-- Pass only the previous chapter step 9 writeback to the next chapter.
-- Persist progress after each successful chapter.
-- Generate a review packet when the run reaches a stop point.
-- Return structured status for CLI and web UI.
+- 读取项目元数据和生产进度。
+- 解析模型槽位。
+- 校验必要环境变量。
+- 决定下一次生产停点。
+- 构建本轮章节队列。
+- 对每一章调用现有 `ChapterOrchestrator.run_chapter`。
+- 只把上一章第9步回写传给下一章。
+- 每章成功后立即持久化进度。
+- 到达停点时生成审稿包。
+- 给 CLI 和网页控制台返回结构化状态。
 
-The existing chapter orchestrator remains responsible for the nine-step chapter pipeline. The production runner only coordinates serial longform progress around it.
+现有章节编排器继续负责九步章节生产。生产控制器只负责九步之外的长篇连载进度管理。
 
-## 5. CLI Design
+## 5. CLI 设计
 
-Add a command:
+新增命令：
 
 ```bash
 python -m scripts.cli production-run --project sample_zerg_queen
 ```
 
-Default behavior:
+默认行为：
 
-- Use the default project preset if the project does not exist yet.
-- Resolve `model_slot_1` unless the user passes `--model-slot`.
-- Continue from `progress.json`.
-- Run to the next default stop point.
-- Stop on the first hard failure.
-- Write run outputs under the production run directory.
+- 如果项目不存在，使用默认项目预设创建项目。
+- 除非用户传入 `--model-slot`，否则解析 `model_slot_1`。
+- 从 `progress.json` 继续生产。
+- 跑到下一个默认停点。
+- 遇到第一个硬失败即停止。
+- 把本轮产物写入正式生产运行目录。
 
-Useful options:
+可用参数：
 
-- `--chapters N`: run a specific number of chapters instead of the default stop point.
-- `--from-chapter N`: start at a specific chapter when the user intentionally resumes or repairs.
-- `--model-slot SLOT`: override the model slot.
-- `--dry-run`: show the production plan and write no chapter content.
-- `--force`: allow a repair run over an existing chapter after explicit user intent.
+- `--chapters N`：指定本轮生成章数，覆盖默认停点。
+- `--from-chapter N`：在用户明确修复或恢复时，从指定章节开始。
+- `--model-slot SLOT`：覆盖模型槽位。
+- `--dry-run`：只展示生产计划，不调用真实模型，也不写章节正文。
+- `--force`：在用户明确意图下，允许覆盖或修复已存在章节。
 
-The CLI is the regression baseline for production behavior.
+CLI 是生产行为的回归验收基线。
 
-## 6. Web UI Design
+## 6. 网页控制台设计
 
-Add a `长篇连载生产线` section to the web console.
+在网页控制台新增 `长篇连载生产线` 模块。
 
-The web UI should support:
+网页控制台需要支持：
 
-- Select project.
-- Select model slot.
-- Display current longform position: volume, arc, unit, chapter.
-- Display next run plan: chapter range and stop reason.
-- Start production through the shared production runner.
-- Show current run status: chapter, stage, retry count, failure reason, and next step.
-- Open chapter artifacts: chapter text, quality report, execution plan, stage summaries, and step 9 writeback.
-- Open the batch review packet and package output.
+- 选择项目。
+- 选择模型槽位。
+- 展示当前长篇位置：卷、弧、单元、章节。
+- 展示下一轮生产计划：章节范围和停点原因。
+- 通过共享生产控制器启动生产。
+- 展示当前运行状态：章节、阶段、重试次数、失败原因、下一步。
+- 打开章节产物：正文、质检报告、执行计划、阶段摘要、第9步回写。
+- 打开批次审稿包和打包结果。
 
-The web layer should not implement its own production logic. It should expose API routes that call the same shared runner used by CLI.
+网页层不得实现自己的生产逻辑。它只提供 API 路由调用与 CLI 相同的共享生产控制器。
 
-## 7. Data And Output Layout
+## 7. 数据结构与输出目录
 
-Formal longform production outputs should live outside ad hoc demo output:
+正式长篇生产产物应独立于临时 demo 输出：
 
 ```text
 novel_outputs/
@@ -142,127 +142,127 @@ novel_outputs/
             fanqie_submission_package.zip
 ```
 
-`project.json` stores:
+`project.json` 保存：
 
-- Book metadata.
-- Original-shadow-world policy.
-- Longform structure.
-- Default model slot.
-- Preset chapter title seeds where available.
+- 书籍元数据。
+- 原创影子世界口径。
+- 长篇结构。
+- 默认模型槽位。
+- 可用的章节标题种子。
 
-`progress.json` stores:
+`progress.json` 保存：
 
-- Last completed chapter index.
-- Next chapter index.
-- Current volume, arc, and unit.
-- Previous chapter step 9 writeback.
-- Last run ID.
-- Last review stop point.
-- Current production state.
+- 最近完成章节序号。
+- 下一章序号。
+- 当前卷、弧、单元。
+- 上一章第9步回写。
+- 最近运行 ID。
+- 最近审稿停点。
+- 当前生产状态。
 
-`run_summary.json` stores:
+`run_summary.json` 保存：
 
-- Run ID.
-- Chapter range.
-- Model slot and resolved model ID.
-- Stop reason.
-- Completed chapters.
-- Failed chapter, if any.
-- Output paths.
-- Next recommended action.
+- 运行 ID。
+- 章节范围。
+- 模型槽位和解析后的模型 ID。
+- 停止原因。
+- 已完成章节。
+- 失败章节，如果存在。
+- 输出路径。
+- 下一步建议。
 
-Progress should be authoritative. The runner should not infer the current chapter by scanning folders.
+`progress.json` 是权威进度来源。生产控制器不应通过扫描目录来猜测当前章节。
 
-## 8. Chapter Gates And Failure Handling
+## 8. 章级闸门与失败处理
 
-The runner should fail early and visibly.
+生产控制器应尽早、清晰地失败。
 
-Hard failures:
+硬失败：
 
-- Missing required model key environment variable.
-- Missing model `base_url`, `model_id`, or `api_key_env`.
-- Empty model output.
-- Thinking content remains in persisted chapter text after cleanup.
-- Stage 6A or any Stage 6B round fails.
-- Stage 8 returns `不放行`.
-- Stage 9 is missing, not usable for the next chapter, or outside the 150-250 character target.
-- A chapter output is missing required artifacts.
+- 缺少必要的模型 Key 环境变量。
+- 缺少模型 `base_url`、`model_id` 或 `api_key_env`。
+- 模型输出为空。
+- 清理后仍有 thinking 内容混入落盘正文。
+- 第6A步或任何第6B单要素迭代失败。
+- 第8步返回 `不放行`。
+- 第9步缺失、无法服务下一章，或不符合 150-250 字目标。
+- 章节缺少必要产物。
 
-Risk states:
+风险状态：
 
-- Stage 7 does not identify at least one repairable issue.
-- Stage 8 returns `带风险放行`.
-- Validator report flags continuity, hook, pacing, or AI-tone warnings.
+- 第7步没有指出至少一个可修问题。
+- 第8步返回 `带风险放行`。
+- 质检报告出现连续性、钩子、节奏或 AI 腔风险。
 
-Risk states should appear in the review packet and web UI. Hard failures stop the run.
+风险状态应展示在审稿包和网页控制台中。硬失败必须停止本轮生产。
 
-## 9. MiniMax-M3 Model Configuration
+## 9. MiniMax-M3 模型配置
 
-Update `model_slot_1` to:
+将 `model_slot_1` 更新为：
 
-- Display name: `MiniMax-M3`
-- Base URL: `https://api.minimaxi.com/v1`
-- API key environment variable: `MINIMAX_API_KEY`
-- Model ID: `MiniMax-M3`
+- 显示名：`MiniMax-M3`
+- Base URL：`https://api.minimaxi.com/v1`
+- API Key 环境变量：`MINIMAX_API_KEY`
+- 模型 ID：`MiniMax-M3`
 
-The client should keep chapter text clean:
+客户端需要保持章节正文干净：
 
-- Prefer request settings that prevent thinking content from being mixed into normal output when supported by the provider.
-- Continue stripping `<think>...</think>` blocks from returned text.
-- Treat cleaned-empty output as a failure.
+- 当模型供应商支持时，优先使用请求参数阻止 thinking 内容混入普通输出。
+- 继续清理返回文本中的 `<think>...</think>` 片段。
+- 清理后为空应视为失败。
 
-The implementation should not store API keys in `config.yaml`, README, tests, docs, logs, or artifacts.
+实现不得把 API Key 存入 `config.yaml`、README、测试、文档、日志或生成产物。
 
-## 10. Review Packet Design
+## 10. 审稿包设计
 
-At every stop point, generate a review packet for the author.
+每个停点都生成给作者看的审稿包。
 
-The packet should include:
+审稿包包含：
 
-- Chapters included in the run.
-- Chapter-level status table.
-- Word count summary.
-- Step 8 exit-gate summary.
-- Step 9 continuity chain summary.
-- New pits, filled pits, and unresolved pits.
-- Main payoff state per chapter.
-- Continuity risks.
-- Setting overload risks.
-- AI-tone and pacing risks.
-- Recommended next run range.
+- 本轮包含的章节。
+- 章级状态表。
+- 字数概览。
+- 第8步出口闸门摘要。
+- 第9步连续性链条摘要。
+- 新挖坑、已填坑、未解决坑。
+- 每章主爽点释放状态。
+- 连续性风险。
+- 设定负荷风险。
+- AI 腔和节奏风险。
+- 下一轮建议生产范围。
 
-The review packet is not a replacement for chapter-level steps 7 and 8. It is the outer author review layer for longform production.
+审稿包不能替代章级第7步和第8步。它是长篇生产外层的作者审稿层。
 
-## 11. Acceptance Criteria
+## 11. 验收标准
 
-Engineering acceptance:
+工程验收：
 
-- `model_slot_1` resolves to MiniMax-M3.
-- `production-run --dry-run` returns the correct next stop point without calling a real model.
-- The production runner persists `project.json`, `progress.json`, `run_config.json`, and `run_summary.json`.
-- The runner can plan chapters 1-3, 4-6, and later `6 / 6 / 6 / 7` unit stop points.
-- CLI and web UI both call the shared production runner.
-- Web UI can display project progress, next run plan, latest run summary, and artifact links.
-- Tests verify that API keys are referenced only by environment variable names.
+- `model_slot_1` 能解析为 MiniMax-M3。
+- `production-run --dry-run` 不调用真实模型，并能返回正确的下一停点。
+- 生产控制器能持久化 `project.json`、`progress.json`、`run_config.json` 和 `run_summary.json`。
+- 生产控制器能规划第 1-3 章、第 4-6 章，以及后续 `6 / 6 / 6 / 7` 单元停点。
+- CLI 和网页控制台都调用共享生产控制器。
+- 网页控制台能展示项目进度、下一轮计划、最近运行摘要和产物链接。
+- 测试验证 API Key 只以环境变量名被引用。
 
-Production acceptance:
+生产验收：
 
-- With `MINIMAX_API_KEY` present, the user can start the default project with MiniMax-M3.
-- The first run produces chapters 1-3 and stops for review.
-- Each completed chapter contains chapter text, quality report, execution plan, stage summaries, and step 9 writeback.
-- Chapter 2 receives only chapter 1 step 9 writeback as continuity input.
-- Chapter 3 receives only chapter 2 step 9 writeback as continuity input.
-- A batch review packet is generated at the stop point.
+- 设置 `MINIMAX_API_KEY` 后，用户可以用 MiniMax-M3 启动默认项目。
+- 第一轮生成第 1-3 章，并在审稿点暂停。
+- 每个完成章节都有正文、质检报告、执行计划、阶段摘要和第9步回写。
+- 第2章只接收第1章第9步回写作为连续性输入。
+- 第3章只接收第2章第9步回写作为连续性输入。
+- 到达停点时生成批次审稿包。
 
-## 12. Non-Goals
+## 12. 非目标
 
-This design does not:
+本设计不做：
 
-- Rewrite the nine-step master template.
-- Generate multiple chapters inside one model conversation.
-- Add a new multi-agent framework.
-- Rework Brave or Tavily search strategy.
-- Split PreHub into M01-M09 agent steps.
-- Automatically generate all 400 chapters in one command by default.
-- Use direct names from existing third-party IP worlds in formal production output.
+- 重写九步母版。
+- 在一个模型对话里生成多章。
+- 新增复杂多 Agent 框架。
+- 重做 Brave 或 Tavily 搜索策略。
+- 把 PreHub 拆成 M01-M09 Agent 工序。
+- 默认一条命令自动生成完整 400 章。
+- 在正式生产正文里直接使用第三方知名 IP 世界名。
 
