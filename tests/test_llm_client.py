@@ -142,7 +142,7 @@ def test_default_model_slot_is_minimax_m3():
 
     reset_config_cache()
     cfg = load_config()
-    resolved = resolve_model_config(cfg, "model_slot_1")
+    resolved = resolve_model_config(cfg)
 
     assert resolved["slot_name"] == "model_slot_1"
     assert resolved["display_name"] == "MiniMax-M3"
