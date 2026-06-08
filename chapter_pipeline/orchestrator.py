@@ -574,6 +574,50 @@ class ChapterOrchestrator:
             "warning": "缺少 Stage 9 回写，后续生产可能偏离轴心。",
         }
 
+    def _write_stage_progress(
+        self,
+        plan: ChapterExecutionPlan,
+        output_root: str | Path,
+        last_task: "AgentTask",
+    ) -> None:
+        """9 步生产线每步增量落盘。
+
+        设计目的：上次全章走完才一次性落盘，中途被 kill / 断电时整章内容全部丢在内存。
+        改造后，每个 task COMPLETED 立即写两份小文件，方便后续恢复或人工审稿：
+
+        - `<chapter_dir>/stage_progress.json` —— 全部 task 的当前 status / 摘要 / 原始 output_payload
+        - `<chapter_dir>/chapter_so_far.md`    —— 用 _build_chapter_text 拼出"到目前为止"的可读正文
+        """
+        root = Path(output_root)
+        project_slug = self._safe_slug(
+            plan.chapter_input.project_bundle.get("project_id", "novel_project"),
+            "novel_project",
+        )
+        chapter_index = plan.chapter_input.chapter_index
+        chapter_slug = f"chapter_{chapter_index:03d}"
+        chapter_dir = root / project_slug / chapter_slug
+        chapter_dir.mkdir(parents=True, exist_ok=True)
+
+        progress_payload = {
+            "project_id": plan.chapter_input.project_bundle.get("project_id", ""),
+            "chapter_index": chapter_index,
+            "chapter_title": plan.chapter_input.current_chapter,
+            "last_completed_task": last_task.task_id,
+            "last_completed_at": last_task.final_decision or "llm_completed",
+            "ledger": asdict(plan.ledger),
+            "tasks": [task.to_dict() for task in plan.tasks],
+        }
+        (chapter_dir / "stage_progress.json").write_text(
+            json.dumps(progress_payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+        try:
+            chapter_so_far = self._build_chapter_text(plan)
+        except Exception:  # noqa: BLE001
+            chapter_so_far = ""
+        (chapter_dir / "chapter_so_far.md").write_text(chapter_so_far, encoding="utf-8")
+
     def _write_output_files(
         self,
         plan: ChapterExecutionPlan,
@@ -707,9 +751,25 @@ class ChapterOrchestrator:
             plan.ledger.completed.append(task.task_id)
             if task.task_id in plan.ledger.pending:
                 plan.ledger.pending.remove(task.task_id)
-            
+
             if verbose:
                 print(f"✅ [Orchestrator] Task {task.task_id} finished.", flush=True)
+
+            # 9 步生产线：每完成一个 task 立即落盘，避免被 kill / 断电时整章丢失。
+            # 增量产物：
+            #   <chapter_dir>/stage_progress.json —— 已完成 task 的状态、摘要、原始 output_payload
+            #   <chapter_dir>/chapter_so_far.md    —— 用 _build_chapter_text 拼出"目前为止"的可读正文
+            if write_files:
+                try:
+                    self._write_stage_progress(plan, output_root, task)
+                except Exception as persist_err:  # noqa: BLE001
+                    # 增量落盘失败不应破坏主流程：打印一行警告继续
+                    if verbose:
+                        print(
+                            f"⚠️ [Orchestrator] stage progress persist failed "
+                            f"after {task.task_id}: {persist_err}",
+                            flush=True,
+                        )
 
         plan.ledger.current_stage = "completed"
         plan.ledger.next_step = "wait_for_next_batch"

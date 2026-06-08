@@ -137,12 +137,12 @@ def _defaults() -> Dict[str, Any]:
                     "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
                 },
                 "model_slot_3": {
-                    "display_name": "模型占位 3",
-                    "base_url": "",
-                    "api_key_env": "MODEL_SLOT_3_API_KEY",
-                    "model_id": "model-slot-3",
-                    "enabled": False,
-                    "note": "预留 OpenAI Chat Completions 模型接口，后续接入真实模型。",
+                    "display_name": "minimax-m3 (pinche/token.jugei)",
+                    "base_url": "https://token.jugei.com/v1",
+                    "api_key_env": "PINCHE_API_KEY",
+                    "model_id": "minimax-m3",
+                    "enabled": True,
+                    "note": "OpenAI Chat Completions 兼容接口（OpenAI SDK 直接调用），base_url=https://token.jugei.com/v1，模型 minimax-m3，API Key 从本机 PINCHE_API_KEY 环境变量读取。",
                 },
                 "model_slot_4": {
                     "display_name": "模型占位 4",
