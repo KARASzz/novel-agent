@@ -5,6 +5,7 @@ from chapter_pipeline.orchestrator import (
     ChapterOrchestrator,
     ChapterPipelineInput,
     ExecutionMode,
+    TaskStatus,
 )
 from chapter_pipeline.prompt_registry import ChapterPromptRegistry, PROMPT_BLOCK_TAGS
 
@@ -125,3 +126,70 @@ def test_plan_rejects_cross_chapter_scope():
             project_goal="番茄小说章节生产",
             current_chapter="第一章至第三章：连续生成",
         )
+
+
+def test_propagate_current_text_pulls_content_from_predecessor():
+    """stage_6b_* 必须把前序任务的 output_payload.content 串接到 current_text。"""
+    orchestrator = ChapterOrchestrator()
+    plan = orchestrator.build_plan(
+        project_goal="番茄小说章节生产",
+        current_chapter="第一章：误入旧站台",
+        previous_chapter_script="上一章状态",
+    )
+
+    predecessor = next(t for t in plan.tasks if t.task_id == "stage_6a_beats_1_2")
+    predecessor.status = TaskStatus.COMPLETED
+    predecessor.output_payload = {
+        "content": "上一轮真实正文：雨打在站台上，铁皮顶棚发出脆响。",
+        "summary": "初稿",
+    }
+
+    target = next(t for t in plan.tasks if t.task_id == "stage_6b_beats_1_2_round_1")
+    assert "current_text" not in target.input_payload  # 起点干净
+
+    ChapterOrchestrator._propagate_current_text(target, plan)
+
+    assert target.input_payload["current_text"] == "上一轮真实正文：雨打在站台上，铁皮顶棚发出脆响。"
+    # 其它字段不能被覆盖丢失
+    assert target.input_payload["iteration_round"] == target.title.split("：", 1)[-1]
+    assert target.input_payload["single_factor_only"] is True
+
+
+def test_propagate_current_text_falls_back_to_full_payload_when_content_missing():
+    """前置 output_payload 没有 content 键时，回退到整段 JSON 字符串。"""
+    plan = ChapterOrchestrator().build_plan(
+        project_goal="番茄",
+        current_chapter="第一章",
+        previous_chapter_script="",
+    )
+
+    # stage_6b_round_2 实际依赖 stage_6b_round_1（链式串行），不是 stage_6a
+    predecessor = next(t for t in plan.tasks if t.task_id == "stage_6b_beats_3_4_round_1")
+    predecessor.status = TaskStatus.COMPLETED
+    predecessor.output_payload = {"summary": "只有摘要", "metadata": {"round": 1}}
+
+    target = next(t for t in plan.tasks if t.task_id == "stage_6b_beats_3_4_round_2")
+
+    ChapterOrchestrator._propagate_current_text(target, plan)
+
+    # 兜底：把整段 payload 序列化进 current_text，保证 LLM 至少有结构化上下文
+    assert "summary" in target.input_payload["current_text"]
+    assert "metadata" in target.input_payload["current_text"]
+
+
+def test_propagate_current_text_skips_non_stage_6b_tasks():
+    """非 stage_6b 任务必须保持原 input_payload 不变。"""
+    plan = ChapterOrchestrator().build_plan(
+        project_goal="番茄",
+        current_chapter="第一章",
+        previous_chapter_script="",
+    )
+
+    # stage_5 不是 6B，必须不被注入 current_text
+    stage_5 = next(t for t in plan.tasks if t.task_id == "stage_5")
+    before = dict(stage_5.input_payload)
+
+    ChapterOrchestrator._propagate_current_text(stage_5, plan)
+
+    assert stage_5.input_payload == before
+    assert "current_text" not in stage_5.input_payload

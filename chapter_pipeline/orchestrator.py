@@ -458,6 +458,27 @@ class ChapterOrchestrator:
         return text.strip()
 
     @staticmethod
+    def _propagate_current_text(task: AgentTask, plan: ChapterExecutionPlan) -> None:
+        """Stage 6B 单要素迭代：把前置任务的 content 串接到 current_text。
+
+        stage_6b_* 的提示词模板要求 <current_text>【粘贴当前正文】</current_text> 字段。
+        plan-build 时无法预知前序 LLM 输出，所以必须在 run_chapter 主循环里、
+        每次 LLM 调用前同步注入。失败兜底为前置任务整段 output_payload 的 JSON 字符串。
+        """
+        if not task.task_id.startswith("stage_6b_") or not task.depends_on:
+            return
+        predecessor = plan.task_map().get(task.depends_on[0])
+        if predecessor is None:
+            return
+        prev_payload = predecessor.output_payload or {}
+        prev_content = prev_payload.get("content")
+        if not prev_content:
+            prev_content = json.dumps(prev_payload, ensure_ascii=False)
+        if task.input_payload is None:
+            task.input_payload = {}
+        task.input_payload["current_text"] = prev_content
+
+    @staticmethod
     def _build_chapter_text(plan: ChapterExecutionPlan) -> str:
         """拼接九步生产线第 6B 步的最终正文（Round 6 为最终迭代结果）。"""
         sections = [
@@ -616,7 +637,12 @@ class ChapterOrchestrator:
                 task.status = TaskStatus.FAILED
                 task.failure_reason = f"missing_dependencies:{','.join(missing)}"
                 raise RuntimeError(task.failure_reason)
-            
+
+            # Stage 6B 单要素迭代需要前序任务的正文作为 current_text。
+            # 前序任务此刻已 COMPLETED（依赖检查保证），可以把 output_payload.content
+            # 同步到本任务的 input_payload。其它任务直接跳过。
+            self._propagate_current_text(task, plan)
+
             task.status = TaskStatus.RUNNING
 
             if task.task_id == "qa_acceptance_parallel":
