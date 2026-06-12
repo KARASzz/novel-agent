@@ -647,9 +647,16 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
     不写全章。
     不解释创作意图。
     不输出理论。
+    这一步必须出一版可读、达字数、能发到番茄连载的纯正文。
   </task>
 
   <input>
+    <project_bundle>
+      【项目预设、人物表、设定边界、底线规则、避免事项、主角权限】
+    </project_bundle>
+    <current_chapter>
+      【当前章节名，例如：第一章：败局重启，女皇归巢】
+    </current_chapter>
     <six_beats>
       【粘贴第5步六节拍施工表】
     </six_beats>
@@ -665,6 +672,7 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
     <sensory>身体感受、环境变化、旁人反应只服务事件推进。</sensory>
     <no_summary>不替读者总结意义。</no_summary>
     <no_ai_tone>避免工整总结腔、概念腔、宏大词收尾。</no_ai_tone>
+    <strict_no_meta>不要输出 "问题识别 / 无法执行 / 等待你提供" 这类元说明。如果上游信息不足，用最小临时假设补齐，写入正文不解释。</strict_no_meta>
   </writing_rules>
 
   <must_include>
@@ -676,18 +684,19 @@ BUILTIN_PROMPT_BLOCKS: Dict[str, str] = {
   </must_include>
 
   <forbidden>
-    <item>不能让金哲洙指挥、授权、调兵、解释完整协议。</item>
+    <item>不得让主角越过项目预设的权限边界（按 project_bundle.guardrails 执行）。</item>
     <item>不能写“他意识到问题严重”。</item>
     <item>不能写“真正的风暴才刚刚开始”。</item>
     <item>不能用抽象权力描述替代系统反馈。</item>
-    <item>不能写现实核武或军事系统操作细节。</item>
+    <item>不能写现实国家、现实军队番号、现实核武流程、现实情报操作教程。</item>
     <item>不能提前写后续节拍。</item>
+    <item>不能输出元说明（问题识别 / 等待提供 / 代写起稿）。</item>
   </forbidden>
 
   <output_format>
     <第6A步_两节拍正文>
       <正文>
-        【只输出正文】
+        【只输出正文，不要解释、不要元说明、不要占位提示】
       </正文>
     </第6A步_两节拍正文>
   </output_format>

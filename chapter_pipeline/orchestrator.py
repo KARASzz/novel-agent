@@ -464,6 +464,9 @@ class ChapterOrchestrator:
         stage_6b_* 的提示词模板要求 <current_text>【粘贴当前正文】</current_text> 字段。
         plan-build 时无法预知前序 LLM 输出，所以必须在 run_chapter 主循环里、
         每次 LLM 调用前同步注入。失败兜底为前置任务整段 output_payload 的 JSON 字符串。
+
+        关键修复：必须把 6A/6B 输出的 meta 包装（"<第6A步_两节拍正文><正文>...</正文>"）
+        拆出来只取真实正文，避免下一轮 6B 把整个 meta XML 当正文修改。
         """
         if not task.task_id.startswith("stage_6b_") or not task.depends_on:
             return
@@ -474,18 +477,49 @@ class ChapterOrchestrator:
         prev_content = prev_payload.get("content")
         if not prev_content:
             prev_content = json.dumps(prev_payload, ensure_ascii=False)
+        # 清洗：从 meta XML 中抽正文；同时去掉 think 块/围栏
+        prev_content = ChapterOrchestrator._clean_content(str(prev_content))
+        # 进一步从结构化字段里抽正文：若 LLM 把正文放在 obj["content"]/obj["正文"]/obj["修订版正文"]
+        if isinstance(predecessor.output_payload, dict):
+            for key in ("content", "正文", "修订版正文", "修订后的正文", "draft_text"):
+                value = predecessor.output_payload.get(key)
+                if isinstance(value, str) and len(value.strip()) > 50:
+                    prev_content = value
+                    break
         if task.input_payload is None:
             task.input_payload = {}
         task.input_payload["current_text"] = prev_content
 
     @staticmethod
+    def _extract_real_text(payload: Dict[str, object]) -> str:
+        """从 LLM 返回的 output_payload 中抽出最像正文的字段。
+
+        优先级：content > 正文 > 修订版正文 > 修订后的正文 > draft_text。
+        若都太短，返回 ""。
+        """
+        if not isinstance(payload, dict):
+            return ""
+        for key in ("content", "正文", "修订版正文", "修订后的正文", "draft_text", "chapter_text"):
+            value = payload.get(key)
+            if isinstance(value, str):
+                cleaned = ChapterOrchestrator._clean_content(value)
+                # 至少要超过 80 字符才算"像正文"
+                if len(cleaned) >= 80:
+                    return cleaned
+        return ""
+
+    @staticmethod
     def _build_chapter_text(plan: ChapterExecutionPlan) -> str:
-        """拼接九步生产线第 6B 步的最终正文（Round 6 为最终迭代结果）。"""
+        """拼接九步生产线第 6B 步的最终正文（Round 6 为最终迭代结果）。
+
+        修复说明：以前只看 round_6 输出，导致 round_2/4 返回空 body 时
+        整个 beat group 在 chapter_so_far.md 里失踪。现在按 round_6 → 5 → 4 → 3 → 2 → 1 → 6A
+        的优先级 fallback，并清洗 meta XML 包装。
+        """
         sections = [
             f"# {plan.chapter_input.current_chapter}",
             "",
         ]
-        # 动态获取当前计划中的节拍分组
         beat_groups = []
         for task_id in plan.task_map():
             if task_id.startswith("stage_6a_beats_"):
@@ -495,19 +529,27 @@ class ChapterOrchestrator:
         beat_groups.sort()
 
         for left, right in beat_groups:
-            # 找到该分组的最后一轮迭代任务
-            group_tasks = [t for tid, t in plan.task_map().items() if tid.startswith(f"stage_6b_beats_{left}_{right}_round_")]
-            if not group_tasks:
-                continue
-            
-            # 按 round_X 排序取最后一个
-            final_task = sorted(group_tasks, key=lambda x: int(x.task_id.split("_")[-1]))[-1]
-            if final_task.status == TaskStatus.COMPLETED:
-                content = ChapterOrchestrator._clean_content(str(final_task.output_payload.get("content", "")))
-                sections.append(content)
+            beat_text = ""
+            # 优先级：round_6 → 5 → 4 → 3 → 2 → 1 → 6A 草稿
+            rounds = sorted(
+                [t for tid, t in plan.task_map().items() if tid.startswith(f"stage_6b_beats_{left}_{right}_round_")],
+                key=lambda x: int(x.task_id.split("_")[-1]),
+                reverse=True,
+            )
+            for round_task in rounds:
+                if round_task.status == TaskStatus.COMPLETED:
+                    candidate = ChapterOrchestrator._extract_real_text(round_task.output_payload or {})
+                    if candidate and len(candidate) >= 80:
+                        beat_text = candidate
+                        break
+            if not beat_text:
+                draft_task = plan.task_map().get(f"stage_6a_beats_{left}_{right}")
+                if draft_task and draft_task.status == TaskStatus.COMPLETED:
+                    beat_text = ChapterOrchestrator._extract_real_text(draft_task.output_payload or {})
+            if beat_text:
+                sections.append(beat_text)
                 sections.append("")
-        
-        # 尝试从 stage_9 获取章尾钩子，若无则由后期润色补足
+
         stage_9 = plan.task_map().get("stage_9")
         if stage_9 and stage_9.status == TaskStatus.COMPLETED:
             hook = stage_9.output_payload.get("hook_for_next_chapter")
@@ -715,35 +757,56 @@ class ChapterOrchestrator:
                 task.failure_reason = f"missing_prompt_block:{task.task_id}"
                 raise RuntimeError(task.failure_reason)
 
-            # 执行真实 LLM 调用
-            try:
-                res = self.llm_client.create_response(
-                    model=model_id,
-                    instructions=prompt_block,
-                    input_text=json.dumps(task.input_payload, ensure_ascii=False),
-                    temperature=0.7
-                )
-                content = res.output_text
+            # 执行真实 LLM 调用（带 3 次退避重试，防止空 body / 连接中途断）
+            import time as _time
 
-                # 如果输出疑似 JSON，尝试解析摘要，否则原样保留正文
-                summary = f"已完成 {task.title}"
+            content = ""
+            last_error: Optional[Exception] = None
+            max_attempts = 3
+            for attempt in range(1, max_attempts + 1):
                 try:
-                    clean_json = self._clean_content(content)
-                    obj = json.loads(clean_json)
-                    if isinstance(obj, dict):
-                        task.output_payload = obj
-                        summary = obj.get("summary", summary)
-                    else:
-                        task.output_payload = {"content": content, "summary": summary}
-                except Exception:
-                    task.output_payload = {"content": content, "summary": summary}
+                    res = self.llm_client.create_response(
+                        model=model_id,
+                        instructions=prompt_block,
+                        input_text=json.dumps(task.input_payload, ensure_ascii=False),
+                        temperature=0.7,
+                    )
+                    content = res.output_text
+                    if content and len(content.strip()) >= 20:
+                        break
+                    if verbose:
+                        print(
+                            f"⚠️ [Orchestrator] Task {task.task_id} attempt {attempt} returned empty/short content ({len(content)} chars), retrying...",
+                            flush=True,
+                        )
+                except Exception as e:
+                    last_error = e
+                    if verbose:
+                        print(
+                            f"⚠️ [Orchestrator] Task {task.task_id} attempt {attempt} exception: {e}",
+                            flush=True,
+                        )
+                if attempt < max_attempts:
+                    _time.sleep(2 ** attempt)
+            if not content or len(content.strip()) < 20:
+                if last_error:
+                    raise last_error
+                raise RuntimeError(
+                    f"Task {task.task_id} LLM returned empty/short content after {max_attempts} attempts"
+                )
 
-            except Exception as e:
-                task.status = TaskStatus.FAILED
-                task.failure_reason = str(e)
-                if verbose:
-                    print(f"❌ [Orchestrator] Task {task.task_id} failed: {e}", flush=True)
-                raise
+            # 如果输出疑似 JSON，尝试解析摘要，否则原样保留正文
+            summary = f"已完成 {task.title}"
+            try:
+                clean_json = self._clean_content(content)
+                obj = json.loads(clean_json)
+                if isinstance(obj, dict):
+                    task.output_payload = obj
+                    summary = obj.get("summary", summary)
+                else:
+                    task.output_payload = {"content": content, "summary": summary}
+            except Exception:
+                task.output_payload = {"content": content, "summary": summary}
 
             task.status = TaskStatus.COMPLETED
             task.final_decision = "llm_completed"
